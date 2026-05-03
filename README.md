@@ -1,3 +1,3 @@
 # EasySplit-app
 
-[![Frontend](https://github.com/dinhhhiuu/react-native-expo/actions/workflows/test.yml/badge.svg)](https://github.com/dinhhhiuu/react-native-expo/actions)
+[![Frontend](https://github.com/L02-Mobile-App-Developers/EasySplit-app/actions/workflows/frontend-test.yml/badge.svg)](https://github.com/L02-Mobile-App-Developers/EasySplit-app/actions)

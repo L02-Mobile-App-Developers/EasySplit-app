@@ -6,4 +6,4 @@
 
 `npm run testFinal` chạy toàn bộ test, không watch, không filter => trước khi push, CI/CD (GitHub Actions), SonarCloud
 
-`npm run testFinal` Jest lưu UI snapshot → lần sau so sánh
+`npm run updateSnapshots` Jest lưu UI snapshot → lần sau so sánh
