@@ -7,3 +7,7 @@
 `npm run testFinal` chạy toàn bộ test, không watch, không filter => trước khi push, CI/CD (GitHub Actions), SonarCloud
 
 `npm run updateSnapshots` Jest lưu UI snapshot → lần sau so sánh
+
+# ICON
+
+[https://icons.expo.fyi/]

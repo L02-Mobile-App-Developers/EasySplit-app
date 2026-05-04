@@ -10,7 +10,7 @@ module.exports = {
     "!**/babel.config.js",
     "!**/expo-env.d.ts",
     "!**/.expo/**",
-    "!**app-examples/**",
+    "!**/app-examples/**",
   ],
   coverageDirectory: "coverage",
   coverageReporters: ["lcov", "text"],
