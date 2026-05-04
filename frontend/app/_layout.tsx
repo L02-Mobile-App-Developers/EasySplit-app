@@ -14,29 +14,33 @@ export default function RootLayout() {
     Inter_900Black,
   });
 
-  // ✅ hook 1
   useEffect(() => {
     if (loaded || error) {
       SplashScreen.hideAsync();
     }
   }, [loaded, error]);
 
-  // ✅ hook 2 (đưa lên trước return)
   useEffect(() => {
     if (Platform.OS === "android") {
       NavigationBar.setStyle("dark");
     }
   }, []);
 
-  // ✅ return sau khi đã gọi hook
-  if (!loaded && !error) {
-    return null;
-  }
+  if (!loaded && !error) return null;
+
+  // giả lập check login
+  const isLoggedIn = true;
 
   return (
     <>
       <StatusBar style="dark" />
-      <Stack />
+      <Stack screenOptions={{ headerShown: false }}>
+        {isLoggedIn ? (
+          <Stack.Screen name="(tabs)" />
+        ) : (
+          <Stack.Screen name="auth" />
+        )}
+      </Stack>
     </>
   );
 }

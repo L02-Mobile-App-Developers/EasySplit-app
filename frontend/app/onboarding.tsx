@@ -5,8 +5,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Index() {
   const [assets, error] = useAssets([
-    require("../assets/images/icon.png"),
-    require("../assets/images/icon.png"),
+    require("@/assets/images/icon.png"),
+    require("@/assets/images/icon.png"),
   ]);
 
   if (!assets) return null;
@@ -22,8 +22,10 @@ export default function Index() {
       <Text style={{ fontFamily: "Inter_900Black" }}>
         Edit app/index.tsx to edit this screen.
       </Text>
-      <Text style={{ fontFamily: "Inter_900Black" }}>Con cac</Text>
-      <Image source={assets[0]} style={{ width: 100, height: 100 }} />
+      <Image
+        source={assets[0]}
+        style={{ width: 100, height: 100, marginBottom: 20 }}
+      />
     </SafeAreaView>
   );
 }
