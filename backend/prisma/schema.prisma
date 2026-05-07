@@ -1,0 +1,238 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// User
+// ============================================================
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  displayName  String   @map("display_name")
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  avatarUrl    String?  @map("avatar_url")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  subscription  Subscription?
+  ownedGroups   Group[]          @relation("GroupOwner")
+  memberships   GroupMember[]
+  expensesPaid  Expense[]        @relation("ExpensePayer")
+  expensesSplit ExpenseParticipant[]
+  expensesCreated     Expense[]            @relation("ExpenseCreator")
+  settlementsCreated  Settlement[]         @relation("SettlementCreator")
+  balances            Balance[]
+  settlementsAsFrom Settlement[] @relation("SettlementFrom")
+  settlementsAsTo   Settlement[] @relation("SettlementTo")
+  remindersTarget  Reminder[]    @relation("ReminderTarget")
+  remindersCreated Reminder[]    @relation("ReminderCreator")
+  auditLogs     AuditLog[]    @relation("AuditLogActor")
+
+  @@map("users")
+}
+
+// ============================================================
+// Subscription
+// ============================================================
+model Subscription {
+  id                String   @id @default(uuid()) @db.Uuid
+  userId            String   @unique @map("user_id") @db.Uuid
+  plan              String   @default("free") // free | premium
+  status            String   @default("active") // trialing | active | grace_period | canceled | expired
+  currentPeriodStart DateTime? @map("current_period_start")
+  currentPeriodEnd   DateTime? @map("current_period_end")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+// ============================================================
+// Group
+// ============================================================
+model Group {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.VarChar(80)
+  category  String   @default("other") // trip | food | roommate | project | other
+  ownerId   String   @map("owner_id") @db.Uuid
+  status    String   @default("active") // active | closed
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  owner       User             @relation("GroupOwner", fields: [ownerId], references: [id])
+  members     GroupMember[]
+  expenses    Expense[]
+  balances    Balance[]
+  settlements Settlement[]
+  reminders   Reminder[]
+
+  @@index([ownerId])
+  @@map("groups")
+}
+
+// ============================================================
+// GroupMember
+// ============================================================
+model GroupMember {
+  groupId  String   @map("group_id") @db.Uuid
+  userId   String   @map("user_id") @db.Uuid
+  role     String   @default("member") // owner | admin | member
+  joinedAt DateTime @default(now()) @map("joined_at")
+  isActive Boolean  @default(true) @map("is_active")
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, userId])
+  @@index([userId])
+  @@map("group_members")
+}
+
+// ============================================================
+// Expense
+// ============================================================
+model Expense {
+  id           String   @id @default(uuid()) @db.Uuid
+  groupId      String   @map("group_id") @db.Uuid
+  description  String   @db.VarChar(255)
+  amount       Int      // stored as integer (VND)
+  currency     String   @default("VND") @db.VarChar(3)
+  paidByUserId String   @map("paid_by_user_id") @db.Uuid
+  splitMode    String   @default("equal") @map("split_mode") // equal | amount | percent | weight
+  createdBy    String   @map("created_by") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  group        Group                @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  payer        User                 @relation("ExpensePayer", fields: [paidByUserId], references: [id])
+  creator      User                 @relation("ExpenseCreator", fields: [createdBy], references: [id])
+  participants ExpenseParticipant[]
+
+  @@index([groupId])
+  @@index([paidByUserId])
+  @@index([createdAt])
+  @@map("expenses")
+}
+
+// ============================================================
+// ExpenseParticipant
+// ============================================================
+model ExpenseParticipant {
+  expenseId String @map("expense_id") @db.Uuid
+  userId    String @map("user_id") @db.Uuid
+  value     Int    // share amount (for amount mode) or percent/weight value
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([expenseId, userId])
+  @@index([userId])
+  @@map("expense_participants")
+}
+
+// ============================================================
+// Balance (materialized per user per group)
+// ============================================================
+model Balance {
+  groupId String @map("group_id") @db.Uuid
+  userId  String @map("user_id") @db.Uuid
+  balance Int    @default(0)
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, userId])
+  @@index([userId])
+  @@map("balances")
+}
+
+// ============================================================
+// Settlement
+// ============================================================
+model Settlement {
+  id          String   @id @default(uuid()) @db.Uuid
+  groupId     String   @map("group_id") @db.Uuid
+  fromUserId  String   @map("from_user_id") @db.Uuid
+  toUserId    String   @map("to_user_id") @db.Uuid
+  amount      Int      // stored as integer (VND)
+  note        String?  @db.VarChar(255)
+  createdBy   String   @map("created_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  group    Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  fromUser User  @relation("SettlementFrom", fields: [fromUserId], references: [id])
+  toUser   User  @relation("SettlementTo", fields: [toUserId], references: [id])
+  creator  User  @relation("SettlementCreator", fields: [createdBy], references: [id])
+
+  @@index([groupId])
+  @@index([fromUserId])
+  @@index([toUserId])
+  @@index([createdAt])
+  @@map("settlements")
+}
+
+// ============================================================
+// Reminder
+// ============================================================
+model Reminder {
+  id            String   @id @default(uuid()) @db.Uuid
+  groupId       String   @map("group_id") @db.Uuid
+  targetUserId  String   @map("target_user_id") @db.Uuid
+  type          String   @default("debt_reminder") // debt_reminder
+  status        String   @default("queued") // queued | sent | failed
+  message       String   @db.VarChar(500)
+  channel       String   @default("in_app") // in_app
+  scheduledAt   DateTime @map("scheduled_at")
+  createdBy     String   @map("created_by") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  group        Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  targetUser   User  @relation("ReminderTarget", fields: [targetUserId], references: [id])
+  creator      User  @relation("ReminderCreator", fields: [createdBy], references: [id])
+
+  @@index([groupId])
+  @@index([targetUserId])
+  @@index([status])
+  @@map("reminders")
+}
+
+// ============================================================
+// AuditLog
+// ============================================================
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorUserId String  @map("actor_user_id") @db.Uuid
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id") @db.Uuid
+  before     Json?
+  after      Json?
+  requestId  String?  @map("request_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  actor User @relation("AuditLogActor", fields: [actorUserId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([actorUserId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ============================================================
+// IdempotencyKey (for idempotency tracking)
+// ============================================================
+model IdempotencyKey {
+  key       String   @id @db.VarChar(255)
+  response  Json
+  createdAt DateTime @default(now()) @map("created_at")
+  expiresAt DateTime @map("expires_at")
+
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}
