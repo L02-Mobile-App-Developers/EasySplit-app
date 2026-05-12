@@ -11,7 +11,7 @@ const money = 123456789;
 const recentActivities = [
   {
     id: 1,
-    image: require("@/assets/images/icon.png"),
+    image: require("../../assets/images/icon.png"),
     description: "A đã thanh toán cho Trà sữa",
     time: "2 giờ trước",
     money: 50000,
@@ -19,7 +19,7 @@ const recentActivities = [
   },
   {
     id: 4,
-    image: require("@/assets/images/icon.png"),
+    image: require("../../assets/images/icon.png"),
     description:
       "A đã thanh toán cho Trà sữaccccccccccccccccccccccccccccccccccccccccccc",
     time: "2 giờ trước",
@@ -28,7 +28,7 @@ const recentActivities = [
   },
   {
     id: 3,
-    image: require("@/assets/images/icon.png"),
+    image: require("../../assets/images/icon.png"),
     description: "A đã thanh toán cho Trà sữa",
     time: "2 giờ trước",
     money: 50000,
@@ -36,7 +36,7 @@ const recentActivities = [
   },
   {
     id: 2,
-    image: require("@/assets/images/icon.png"),
+    image: require("../../assets/images/icon.png"),
     description: "A đã thanh toán cho Trà sữa",
     time: "2 giờ trước",
     money: 50000,

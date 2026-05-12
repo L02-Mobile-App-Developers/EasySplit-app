@@ -2,12 +2,12 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import { AntDesign, EvilIcons, FontAwesome6 } from "@expo/vector-icons";
 import { useState } from "react";
 import {
-  Image,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Image,
+    ScrollView,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 import { router } from "expo-router";
@@ -21,12 +21,12 @@ const status = [
 const groupList = [
   {
     id: 1,
-    avt: require("@/assets/images/icon.png"),
+    avt: require("../../../assets/images/icon.png"),
     name: "Du lịch Đà lạt",
     members: 4,
     type: "Du lịch",
     settled: false, // đã quyết toán chưa
-    icon: require("@/assets/images/icon.png"),
+    icon: require("../../../assets/images/icon.png"),
     money: 50000, // số tiền mình nợ (âm) hoặc được hoàn (dương)
     recentActivity: {
       description: "A đã thanh toán cho Trà sữa",
@@ -35,12 +35,12 @@ const groupList = [
   },
   {
     id: 2,
-    avt: require("@/assets/images/icon.png"),
+    avt: require("../../../assets/images/icon.png"),
     name: "Du lịch Vũng tàu",
     members: 4,
     type: "Du lịch",
     settled: false, // đã quyết toán chưa
-    icon: require("@/assets/images/icon.png"),
+    icon: require("../../../assets/images/icon.png"),
     money: -50000, // số tiền mình nợ (âm) hoặc được hoàn (dương)
     recentActivity: {
       description: "A đã thanh toán cho Trà sữa",
@@ -49,12 +49,12 @@ const groupList = [
   },
   {
     id: 3,
-    avt: require("@/assets/images/icon.png"),
+    avt: require("../../../assets/images/icon.png"),
     name: "Du lịch Kon tum",
     members: 4,
     type: "Du lịch",
     settled: true, // đã quyết toán chưa
-    icon: require("@/assets/images/icon.png"),
+    icon: require("../../../assets/images/icon.png"),
     money: -50000, // số tiền mình nợ (âm) hoặc được hoàn (dương)
     recentActivity: {
       description: "A đã thanh toán cho Trà sữa",
@@ -63,12 +63,12 @@ const groupList = [
   },
   {
     id: 4,
-    avt: require("@/assets/images/icon.png"),
+    avt: require("../../../assets/images/icon.png"),
     name: "Tiền nhà trọ",
     members: 4,
     type: "Du lịch",
     settled: false,
-    icon: require("@/assets/images/icon.png"),
+    icon: require("../../../assets/images/icon.png"),
     money: -50000,
     recentActivity: {
       description: "A đã thanh toán cho Trà sữa",
