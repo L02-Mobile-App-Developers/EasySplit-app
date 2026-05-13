@@ -231,32 +231,6 @@ export default function HistoryScreen() {
         {/* Summary Card */}
         <SummaryCard />
       </ScrollView>
-
-      {/* Bottom Navigation (static mock) */}
-      <View style={{ height: 72, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#E6E7E8", justifyContent: "center" }}>
-        <View style={{ flexDirection: "row", justifyContent: "space-around", alignItems: "center" }}>
-          <TouchableOpacity style={{ alignItems: "center" }}>
-            <MaterialIcons name="home" size={22} color="#6B7280" />
-            <Text style={{ fontSize: 12, color: "#6B7280" }}>HOME</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={{ alignItems: "center" }}>
-            <MaterialCommunityIcons name="account-group-outline" size={22} color="#6B7280" />
-            <Text style={{ fontSize: 12, color: "#6B7280" }}>NHÓM</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={{ alignItems: "center" }}>
-            <MaterialIcons name="person-add" size={22} color="#6B7280" />
-            <Text style={{ fontSize: 12, color: "#6B7280" }}>BẠN BÈ</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={{ alignItems: "center" }}>
-            <MaterialIcons name="history" size={22} color="#16A34A" />
-            <Text style={{ fontSize: 12, color: "#16A34A" }}>LỊCH SỬ</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={{ alignItems: "center" }}>
-            <MaterialIcons name="person" size={22} color="#6B7280" />
-            <Text style={{ fontSize: 12, color: "#6B7280" }}>CÁ NHÂN</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
     </View>
   );
 }
