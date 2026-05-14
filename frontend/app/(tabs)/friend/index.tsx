@@ -1,25 +1,26 @@
 import TopAppBar from "@/components/TopAppBar";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import {
-  AntDesign,
-  EvilIcons,
-  MaterialIcons
+    AntDesign,
+    EvilIcons,
+    MaterialIcons
 } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  Image,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Image,
+    ScrollView,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from "react-native";
 
 // ============================================================================
 // MOCK DATA
 // ============================================================================
 
-const friendRequests = [
+const mockFriendRequests = [
   {
     id: 1,
     name: "Minh Anh",
@@ -28,7 +29,7 @@ const friendRequests = [
   },
 ];
 
-const friendsList = [
+const mockFriendsList = [
   {
     id: 1,
     name: "Lan Tran",
@@ -325,11 +326,26 @@ const FriendListItem: React.FC<FriendListItemProps> = ({
 };
 
 // ============================================================================
+// API SIMULATION
+// ============================================================================
+
+const fetchFriends = () => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({ requests: mockFriendRequests, friends: mockFriendsList });
+    }, 2000); // 2 second delay
+  });
+};
+
+// ============================================================================
 // MAIN SCREEN
 // ============================================================================
 
 export default function FriendScreen() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [friendRequests, setFriendRequests] = useState<any[]>([]);
+  const [friendsList, setFriendsList] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const {
     textColor,
@@ -342,6 +358,17 @@ export default function FriendScreen() {
     backgroundWhite,
     darkGreen,
   } = useAppTheme();
+
+  useEffect(() => {
+    const loadFriends = async () => {
+      setLoading(true);
+      const data = await fetchFriends() as any;
+      setFriendRequests(data.requests);
+      setFriendsList(data.friends);
+      setLoading(false);
+    };
+    loadFriends();
+  }, []);
 
   const handleAcceptRequest = (requestId: number) => {
     console.log("Accept request:", requestId);
@@ -372,6 +399,25 @@ export default function FriendScreen() {
     console.log("Settings pressed");
     // TODO: Navigate to settings screen
   };
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: backgroundColor }}>
+        <TopAppBar
+          title="EasySplit"
+          showBack={false}
+          showSearch={true}
+          showSettings={true}
+          onSearchPress={handleSearch}
+          onSettingsPress={handleSettings}
+        />
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <ActivityIndicator size="large" color={successGreen} />
+          <Text style={{ marginTop: 12, color: tabIconDefault, fontSize: 14 }}>Đang tải bạn bè...</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: backgroundColor }}>

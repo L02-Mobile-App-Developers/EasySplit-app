@@ -1,8 +1,9 @@
 import TopAppBar from "@/components/TopAppBar";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   ScrollView,
   Text,
@@ -13,7 +14,7 @@ import {
 // ---------------------------------------------------------------------------
 // Mock Data
 // ---------------------------------------------------------------------------
-const transactions = [
+const mockTransactions = [
   {
     id: "t1",
     section: "HÔM NAY",
@@ -195,15 +196,42 @@ const SummaryCard: React.FC = () => (
 // Main Screen
 // ---------------------------------------------------------------------------
 
+// Simulate API call to fetch transactions
+const fetchTransactions = () => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(mockTransactions);
+    }, 2000); // 2 second delay
+  });
+};
+
 export default function HistoryScreen() {
   const { backgroundColor } = useAppTheme();
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadTransactions = async () => {
+      setLoading(true);
+      const data = await fetchTransactions() as any[];
+      setTransactions(data);
+      setLoading(false);
+    };
+    loadTransactions();
+  }, []);
 
   return (
     <View style={{ flex: 1, backgroundColor: "#F7F9FB" }}>
       <TopAppBar title="EasySplit" showBack={false} />
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 18, paddingBottom: 24 }}>
-        <Text style={{ fontSize: 28, fontWeight: "700", color: "#0F172A", marginBottom: 12 }}>Lịch sử</Text>
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <ActivityIndicator size="large" color="#16A34A" />
+          <Text style={{ marginTop: 12, color: "#6B7280", fontSize: 14 }}>Đang tải lịch sử...</Text>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 18, paddingBottom: 24 }}>
+          <Text style={{ fontSize: 28, fontWeight: "700", color: "#0F172A", marginBottom: 12 }}>Lịch sử</Text>
 
         {/* Filter chips */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 18 }}>
@@ -228,9 +256,10 @@ export default function HistoryScreen() {
           </View>
         ))}
 
-        {/* Summary Card */}
-        <SummaryCard />
-      </ScrollView>
+          {/* Summary Card */}
+          <SummaryCard />
+        </ScrollView>
+      )}
     </View>
   );
 }

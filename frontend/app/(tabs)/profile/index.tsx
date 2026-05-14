@@ -1,6 +1,8 @@
 import TopAppBar from "@/components/TopAppBar";
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
+import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   ScrollView,
   Text,
@@ -8,7 +10,63 @@ import {
   View,
 } from "react-native";
 
+// Mock profile data
+const mockProfileData = {
+  name: "Minh Nguyen",
+  email: "minh@gmail.com",
+  phone: "090xxxxxxx",
+  groups: 12,
+  friends: 48,
+  transactions: 156,
+  avatar: require("../../../assets/images/icon.png"),
+};
+
+// Simulate API call to fetch profile
+const fetchProfileData = () => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(mockProfileData);
+    }, 2000); // 2 second delay
+  });
+};
+
 const ProfileScreen = () => {
+  const [profile, setProfile] = useState<typeof mockProfileData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      setLoading(true);
+      const data = await fetchProfileData() as typeof mockProfileData;
+      setProfile(data);
+      setLoading(false);
+    };
+    loadProfile();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#F7F9FB" }}>
+        <TopAppBar title="EasySplit" showBack={false} />
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <ActivityIndicator size="large" color="#16A34A" />
+          <Text style={{ marginTop: 12, color: "#6B7280", fontSize: 14 }}>Đang tải hồ sơ...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#F7F9FB" }}>
+        <TopAppBar title="EasySplit" showBack={false} />
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <Text style={{ color: "#6B7280" }}>Không thể tải dữ liệu</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: "#F7F9FB" }}>
       <TopAppBar title="EasySplit" showBack={false} />
@@ -19,7 +77,7 @@ const ProfileScreen = () => {
           {/* Avatar with Edit Badge */}
           <View style={{ position: "relative", marginBottom: 16 }}>
             <Image
-              source={require("../../../assets/images/icon.png")}
+              source={profile.avatar}
               style={{
                 width: 120,
                 height: 120,
@@ -50,13 +108,13 @@ const ProfileScreen = () => {
 
           {/* User Details */}
           <Text style={{ fontSize: 24, fontWeight: "700", color: "#0F172A", marginBottom: 6 }}>
-            Minh Nguyen
+            {profile.name}
           </Text>
           <Text style={{ fontSize: 14, color: "#6B7280", marginBottom: 4 }}>
-            minh@gmail.com
+            {profile.email}
           </Text>
           <Text style={{ fontSize: 14, color: "#9CA3AF" }}>
-            090xxxxxxx
+            {profile.phone}
           </Text>
         </View>
 
@@ -81,7 +139,7 @@ const ProfileScreen = () => {
             }}
           >
             <Text style={{ fontSize: 28, fontWeight: "700", color: "#16A34A", marginBottom: 6 }}>
-              12
+              {profile.groups}
             </Text>
             <Text style={{ fontSize: 11, fontWeight: "700", color: "#6B7280", letterSpacing: 0.5 }}>
               SỐ NHÓM
@@ -100,7 +158,7 @@ const ProfileScreen = () => {
             }}
           >
             <Text style={{ fontSize: 28, fontWeight: "700", color: "#16A34A", marginBottom: 6 }}>
-              48
+              {profile.friends}
             </Text>
             <Text style={{ fontSize: 11, fontWeight: "700", color: "#6B7280", letterSpacing: 0.5 }}>
               SỐ BẠN BÈ
@@ -119,7 +177,7 @@ const ProfileScreen = () => {
             }}
           >
             <Text style={{ fontSize: 28, fontWeight: "700", color: "#16A34A", marginBottom: 6 }}>
-              156
+              {profile.transactions}
             </Text>
             <Text style={{ fontSize: 11, fontWeight: "700", color: "#6B7280", letterSpacing: 0.5 }}>
               GIAO DỊCH
