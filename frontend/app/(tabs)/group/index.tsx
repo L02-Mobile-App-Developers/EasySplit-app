@@ -2,20 +2,20 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import { AntDesign, EvilIcons, FontAwesome6 } from "@expo/vector-icons";
 import { useState } from "react";
 import {
-    Image,
-    ScrollView,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Image,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 import { router } from "expo-router";
 
 const status = [
-  { id: 1, name: "Tất cả" },
-  { id: 2, name: "Đang hoạt động" },
-  { id: 3, name: "Đã quyết toán" },
+  { id: 10, name: "Tất cả" },
+  { id: 20, name: "Đang hoạt động" },
+  { id: 30, name: "Đã quyết toán" },
 ];
 
 const groupList = [
@@ -79,7 +79,7 @@ const groupList = [
 
 export default function Index() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState(1);
+  const [selectedStatus, setSelectedStatus] = useState(10);
 
   const {
     lightGray,
@@ -95,7 +95,7 @@ export default function Index() {
 
   return (
     // fix button
-    <View>
+    <View style={{ flex: 1 }}>
       <TouchableOpacity
         style={{
           position: "absolute",
@@ -144,16 +144,20 @@ export default function Index() {
         </View>
 
         {/* Selected bar */}
-        <View
-          style={{
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{
             flexDirection: "row",
             marginBottom: 20,
-            justifyContent: "space-between",
+            justifyContent: "center",
             gap: 8,
+            flexGrow: 1,
           }}
         >
           {status.map((item) => (
             <TouchableOpacity
+              key={item.id}
               style={{
                 backgroundColor:
                   selectedStatus === item.id ? successGreen : lightGray,
@@ -175,7 +179,8 @@ export default function Index() {
               </Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
+        {/* </View> */}
 
         {/* Group List */}
         {groupList.map((item) => (
