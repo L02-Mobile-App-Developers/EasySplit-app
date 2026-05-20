@@ -2,7 +2,8 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import { AntDesign, MaterialIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, TouchableOpacity, View } from "react-native";
+import { ThemedText } from "@/components/ThemedText";
 // import { SafeAreaView } from "react-native-safe-area-context";
 
 // hardcode
@@ -105,12 +106,12 @@ export default function Index() {
           gap: 8,
         }}
       >
-        <Text style={{ color: textColor, fontSize: 18, fontWeight: "bold" }}>
+        <ThemedText fontWeight="bold" style={{ color: textColor, fontSize: 18 }}>
           Tổng chênh lệch
-        </Text>
-        <Text style={{ fontWeight: "bold", fontSize: 28, color: successGreen }}>
+        </ThemedText>
+        <ThemedText fontWeight="bold" style={{ fontSize: 28, color: successGreen }}>
           +{money.toLocaleString()}
-        </Text>
+        </ThemedText>
         <View
           style={{
             backgroundColor: selected,
@@ -120,15 +121,15 @@ export default function Index() {
             width: "50%",
           }}
         >
-          <Text
+          <ThemedText
+            fontWeight="semibold"
             style={{
-              fontWeight: "600",
               textAlign: "center",
               color: textColor,
             }}
           >
             Dòng tiền dương
-          </Text>
+          </ThemedText>
         </View>
       </View>
 
@@ -144,12 +145,12 @@ export default function Index() {
             gap: 10,
           }}
         >
-          <Text style={{ fontWeight: "bold", color: errorRed }}>
+          <ThemedText fontWeight="bold" style={{ color: errorRed }}>
             Bạn đang nợ
-          </Text>
-          <Text style={{ fontWeight: "bold", color: errorRed, fontSize: 18 }}>
+          </ThemedText>
+          <ThemedText fontWeight="bold" style={{ color: errorRed, fontSize: 18 }}>
             {money.toLocaleString()}
-          </Text>
+          </ThemedText>
         </View>
         <View
           style={{
@@ -161,20 +162,21 @@ export default function Index() {
             gap: 10,
           }}
         >
-          <Text style={{ fontWeight: "bold", color: successGreen }}>
+          <ThemedText fontWeight="bold" style={{ color: successGreen }}>
             Bạn được nhận
-          </Text>
-          <Text
-            style={{ fontWeight: "bold", color: successGreen, fontSize: 18 }}
+          </ThemedText>
+          <ThemedText
+            fontWeight="bold"
+            style={{ color: successGreen, fontSize: 18 }}
           >
             {money.toLocaleString()}
-          </Text>
+          </ThemedText>
         </View>
       </View>
 
       {/* Thao tác nhanh */}
       <View style={{ marginTop: 20, flexDirection: "column", gap: 10 }}>
-        <Text>Thao tác nhanh</Text>
+        <ThemedText>Thao tác nhanh</ThemedText>
 
         <View
           style={{
@@ -199,9 +201,9 @@ export default function Index() {
               >
                 {item.icon}
               </View>
-              <Text style={{ marginTop: 5, fontWeight: "500" }}>
+              <ThemedText style={{ marginTop: 5 }}>
                 {item.label}
-              </Text>
+              </ThemedText>
             </TouchableOpacity>
           ))}
         </View>
@@ -210,8 +212,8 @@ export default function Index() {
       {/* Nhóm gần đây */}
       <View style={{ flexDirection: "column", gap: 10, marginTop: 20 }}>
         <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-          <Text>Nhóm gần đây</Text>
-          <Text style={{ color: selected }}>Xem tất cả</Text>
+          <ThemedText>Nhóm gần đây</ThemedText>
+          <ThemedText style={{ color: selected }}>Xem tất cả</ThemedText>
         </View>
         <View
           style={{
@@ -245,15 +247,16 @@ export default function Index() {
                 <MaterialIcons name="tour" size={24} color="black" />
               </View>
 
-              <Text
+              <ThemedText
                 numberOfLines={1}
                 ellipsizeMode="tail"
-                style={{ fontWeight: "bold", fontSize: 16 }}
+                fontWeight="bold"
+                style={{ fontSize: 16 }}
               >
                 {item.name}
-              </Text>
-              <Text style={{ fontSize: 14 }}>{item.members} thành viên</Text>
-              <Text style={{ marginTop: 12 }}>{item.status}</Text>
+              </ThemedText>
+              <ThemedText style={{ fontSize: 14 }}>{item.members} thành viên</ThemedText>
+              <ThemedText style={{ marginTop: 12 }}>{item.status}</ThemedText>
             </View>
           ))}
         </View>
@@ -261,7 +264,7 @@ export default function Index() {
 
       {/* Hoạt động gần đây */}
       <View style={{ flexDirection: "column", gap: 10, marginTop: 20 }}>
-        <Text>Hoạt động gần đây</Text>
+        <ThemedText>Hoạt động gần đây</ThemedText>
         {recentActivities.map((item) => (
           <View
             key={item.id}
@@ -292,10 +295,10 @@ export default function Index() {
                   width: "60%",
                 }}
               >
-                <Text numberOfLines={1} ellipsizeMode="tail">
+                <ThemedText numberOfLines={1} ellipsizeMode="tail">
                   {item.description}
-                </Text>
-                <Text>{item.time}</Text>
+                </ThemedText>
+                <ThemedText>{item.time}</ThemedText>
               </View>
               {/* right */}
               <View
@@ -306,8 +309,8 @@ export default function Index() {
                   flex: 1,
                 }}
               >
-                <Text>${item.money}</Text>
-                <Text>{item.type === "received" ? "Lấy lại" : "Cần trả"}</Text>
+                <ThemedText>${item.money}</ThemedText>
+                <ThemedText>{item.type === "received" ? "Lấy lại" : "Cần trả"}</ThemedText>
               </View>
             </View>
           </View>

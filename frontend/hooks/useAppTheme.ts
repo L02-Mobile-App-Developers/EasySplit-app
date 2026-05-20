@@ -1,4 +1,5 @@
 import { useThemeColor } from "@/hooks/use-theme-color";
+import { FontFamily } from "@/constants/fonts";
 
 export function useAppTheme() {
   return {
@@ -15,5 +16,12 @@ export function useAppTheme() {
     lightRed: useThemeColor({}, "lightRed"),
     lightGreen: useThemeColor({}, "lightGreen"),
     darkGreen: useThemeColor({}, "darkGreen"),
+    // Font families
+    fontRegular: FontFamily.regular,
+    fontMedium: FontFamily.medium,
+    fontSemibold: FontFamily.semibold,
+    fontBold: FontFamily.bold,
+    fontExtrabold: FontFamily.extrabold,
+    fontBlack: FontFamily.black,
   };
 }
