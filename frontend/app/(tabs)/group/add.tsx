@@ -16,7 +16,7 @@ import {
   FontAwesome5,
   FontAwesome6,
   MaterialCommunityIcons,
-  MaterialIcons
+  MaterialIcons,
 } from "@expo/vector-icons";
 
 import { FriendInfo } from "@/types";
