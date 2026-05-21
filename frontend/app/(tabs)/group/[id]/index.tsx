@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { useLocalSearchParams } from "expo-router";
 import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
@@ -209,7 +210,7 @@ export default function GroupDetail() {
             paddingHorizontal: 12,
             borderRadius: 10,
           }}
-          onPress={() => {}}
+          onPress={() => router.push(`/group/${id}/add-expense`)}
         >
           <MaterialIcons name="add-circle-outline" size={24} color="white" />
           <Text style={{ fontSize: 16, color: "white" }}>Thêm khoản chi</Text>

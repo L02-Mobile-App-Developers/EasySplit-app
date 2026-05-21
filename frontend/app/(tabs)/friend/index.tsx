@@ -5,6 +5,7 @@ import {
     EvilIcons,
     MaterialIcons
 } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
@@ -362,9 +363,12 @@ export default function FriendScreen() {
   useEffect(() => {
     const loadFriends = async () => {
       setLoading(true);
-      const data = await fetchFriends() as any;
-      setFriendRequests(data.requests);
-      setFriendsList(data.friends);
+      // Temporarily skip API fetch to speed up local development
+      // const data = await fetchFriends() as any;
+      // setFriendRequests(data.requests);
+      // setFriendsList(data.friends);
+      setFriendRequests(mockFriendRequests);
+      setFriendsList(mockFriendsList);
       setLoading(false);
     };
     loadFriends();
@@ -386,8 +390,7 @@ export default function FriendScreen() {
   };
 
   const handleAddFriendByEmail = () => {
-    console.log("Add friend by email");
-    // TODO: Navigate to add friend screen
+    router.push("/friend/add");
   };
 
   const handleSearch = () => {
@@ -433,7 +436,8 @@ export default function FriendScreen() {
 
       <ScrollView
         contentContainerStyle={{
-          paddingTop: 20,
+          // Increased paddingTop to match Group page spacing
+          paddingTop: 60,
           paddingLeft: 20,
           paddingRight: 20,
           paddingBottom: 20,
