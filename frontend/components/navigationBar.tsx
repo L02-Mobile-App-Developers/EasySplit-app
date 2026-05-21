@@ -2,6 +2,7 @@ import { Entypo, Ionicons } from "@expo/vector-icons";
 import { router, usePathname } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAppTheme } from "@/hooks/useAppTheme";
 
@@ -54,11 +55,15 @@ const activeItems = [
 export default function NavigationBar() {
   const pathname = usePathname();
   const [containerWidth, setContainerWidth] = useState(0);
+  const insets = useSafeAreaInsets();
   const { backgroundColor, iconDefaultColor, successGreen } = useAppTheme();
 
   return (
     <View
-      style={[styles.container, { backgroundColor: backgroundColor }]}
+      style={[
+        styles.container,
+        { backgroundColor: backgroundColor, paddingBottom: (insets.bottom || 0) + 12 },
+      ]}
       onLayout={(e) => {
         setContainerWidth(e.nativeEvent.layout.width);
       }}

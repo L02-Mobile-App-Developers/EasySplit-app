@@ -360,6 +360,15 @@ export default function FriendScreen() {
     darkGreen,
   } = useAppTheme();
 
+  // Derived filtered lists based on search query
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filteredFriendRequests = normalizedQuery
+    ? friendRequests.filter((r) => r.name.toLowerCase().includes(normalizedQuery))
+    : friendRequests;
+  const filteredFriendsList = normalizedQuery
+    ? friendsList.filter((f) => f.name.toLowerCase().includes(normalizedQuery))
+    : friendsList;
+
   useEffect(() => {
     const loadFriends = async () => {
       setLoading(true);
@@ -512,7 +521,7 @@ export default function FriendScreen() {
         </TouchableOpacity>
 
         {/* Friend Requests Section */}
-        {friendRequests.length > 0 && (
+        {filteredFriendRequests.length > 0 && (
           <View style={{ marginBottom: 28 }}>
             {/* Header with Badge */}
             <View
@@ -555,7 +564,7 @@ export default function FriendScreen() {
             </View>
 
             {/* Friend Request Cards */}
-            {friendRequests.map((request) => (
+            {filteredFriendRequests.map((request) => (
               <FriendRequestCard
                 key={request.id}
                 name={request.name}
@@ -571,6 +580,13 @@ export default function FriendScreen() {
               />
             ))}
           </View>
+        )}
+
+        {/* No results message when searching */}
+        {normalizedQuery !== "" && filteredFriendRequests.length === 0 && filteredFriendsList.length === 0 && (
+          <Text style={{ textAlign: "center", color: tabIconDefault, marginVertical: 20 }}>
+            Không tìm thấy kết quả
+          </Text>
         )}
 
         {/* Friends List Section */}
@@ -589,7 +605,7 @@ export default function FriendScreen() {
           </Text>
 
           {/* Friend List Items */}
-          {friendsList.map((friend) => (
+          {filteredFriendsList.map((friend) => (
             <FriendListItem
               key={friend.id}
               name={friend.name}

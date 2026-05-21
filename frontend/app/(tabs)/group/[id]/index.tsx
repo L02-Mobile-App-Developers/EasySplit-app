@@ -333,8 +333,9 @@ export default function GroupDetail() {
 
           {/* ITEMS */}
           {items.map((activity) => (
-            <View
+            <TouchableOpacity
               key={activity.id}
+              onPress={() => router.push(`/group/${id}/expense/${activity.id}`)}
               style={{
                 flexDirection: "row",
                 justifyContent: "space-between",
@@ -374,7 +375,7 @@ export default function GroupDetail() {
                     : `${activity.moneyforyou}đ`}
                 </Text>
               </View>
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
       ))}
