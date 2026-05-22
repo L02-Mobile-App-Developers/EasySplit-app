@@ -1,7 +1,9 @@
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { EvilIcons, MaterialIcons } from "@expo/vector-icons";
-import React from "react";
-import { StatusBar, Text, TouchableOpacity, View } from "react-native";
+import { router } from "expo-router";
+import React, { ReactNode } from "react";
+import { Pressable, StatusBar, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 interface TopAppBarProps {
   title?: string;
@@ -11,113 +13,108 @@ interface TopAppBarProps {
   onBackPress?: () => void;
   onSearchPress?: () => void;
   onSettingsPress?: () => void;
+  rightContent?: ReactNode;
 }
-
-/**
- * TopAppBar Component
- *
- * A minimalist, pixel-perfect header component for the EasySplit app.
- * Positioned at the top of the screen with customizable actions.
- *
- * @param {TopAppBarProps} props
- * @returns {React.FC}
- */
 const TopAppBar: React.FC<TopAppBarProps> = ({
   title = "EasySplit",
   showBack = false,
-  showSearch = true,
-  showSettings = true,
+  showSearch = false,
+  showSettings = false,
   onBackPress,
   onSearchPress,
   onSettingsPress,
+  rightContent,
 }) => {
-  // const { darkGreen, lightGray, backgroundWhite } = useAppTheme();
+  const { darkGreen, lightGray, backgroundWhite } = useAppTheme();
 
-  // return (
-  //   <>
-  //     {/* Status Bar */}
-  //     <StatusBar barStyle="dark-content" backgroundColor={backgroundWhite} />
+  const handleBackPress = onBackPress ?? (() => router.back());
 
-  //     {/* Top App Bar */}
-  //     <View
-  //       style={{
-  //         backgroundColor: backgroundWhite,
-  //         paddingTop: 12,
-  //         paddingBottom: 12,
-  //         paddingHorizontal: 16,
-  //         flexDirection: "row",
-  //         alignItems: "center",
-  //         justifyContent: "space-between",
-  //         borderBottomWidth: 1,
-  //         borderBottomColor: lightGray,
-  //         shadowColor: "#000",
-  //         shadowOffset: { width: 0, height: 1 },
-  //         shadowOpacity: 0.04,
-  //         shadowRadius: 2,
-  //         elevation: 1,
-  //       }}
-  //     >
-  //       {/* Left Section: Back Arrow + Title */}
-  //       <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-  //         {/* Back Button */}
-  //         {showBack && (
-  //           <TouchableOpacity
-  //             onPress={onBackPress}
-  //             style={{
-  //               padding: 8,
-  //               marginLeft: -8,
-  //               marginRight: 8,
-  //             }}
-  //             activeOpacity={0.7}
-  //           >
-  //             <MaterialIcons name="arrow-back" size={24} color={darkGreen} />
-  //           </TouchableOpacity>
-  //         )}
+  return (
+    <>
+      <StatusBar barStyle="dark-content" backgroundColor={backgroundWhite} />
+      <SafeAreaView edges={["top"]} style={[styles.safeArea, { backgroundColor: backgroundWhite, borderBottomColor: lightGray }]}>
+        <View style={styles.container}>
+          <View style={styles.leftSection}>
+            {showBack && (
+              <Pressable onPress={handleBackPress} style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
+                <MaterialIcons name="arrow-back" size={22} color={darkGreen} />
+              </Pressable>
+            )}
 
-  //         {/* Title Text */}
-  //         <Text
-  //           style={{
-  //             fontSize: 18,
-  //             fontWeight: "600",
-  //             color: darkGreen,
-  //             letterSpacing: 0.3,
-  //           }}
-  //         >
-  //           {title}
-  //         </Text>
-  //       </View>
+            <View style={styles.titleWrap}>
+              <Text style={[styles.title, { color: darkGreen }]} numberOfLines={1}>
+                {title}
+              </Text>
+            </View>
+          </View>
 
-  //       {/* Right Section: Search & Settings Icons */}
-  //       <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-  //         {/* Search Icon */}
-  //         {showSearch && (
-  //           <TouchableOpacity
-  //             onPress={onSearchPress}
-  //             style={{
-  //               padding: 8,
-  //             }}
-  //             activeOpacity={0.7}
-  //           >
-  //             <EvilIcons name="search" size={24} color={darkGreen} />
-  //           </TouchableOpacity>
-  //         )}
-
-  //         {/* Settings Icon */}
-  //         {showSettings && (
-  //           <TouchableOpacity
-  //             onPress={onSettingsPress}
-  //             style={{
-  //               padding: 8,
-  //             }}
-  //             activeOpacity={0.7}
-  //           >
-  //             <MaterialIcons name="settings" size={24} color={darkGreen} />
-  //           </TouchableOpacity>
-  //         )}
-  //       </View>
-  //     </View>
-  //   </>
-  // );
+          <View style={styles.rightSection}>
+            {rightContent}
+            {showSearch && (
+              <Pressable onPress={onSearchPress} style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
+                <EvilIcons name="search" size={26} color={darkGreen} />
+              </Pressable>
+            )}
+            {showSettings && (
+              <Pressable onPress={onSettingsPress} style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
+                <MaterialIcons name="settings" size={22} color={darkGreen} />
+              </Pressable>
+            )}
+          </View>
+        </View>
+      </SafeAreaView>
+    </>
+  );
 };
+
+const styles = StyleSheet.create({
+  safeArea: {
+    borderBottomWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  container: {
+    minHeight: 56,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  leftSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    minWidth: 0,
+  },
+  titleWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
+  rightSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  iconButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  pressed: {
+    backgroundColor: "rgba(0, 110, 47, 0.08)",
+  },
+});
 
 export default TopAppBar;

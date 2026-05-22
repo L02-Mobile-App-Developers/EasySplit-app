@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import TopAppBar from "@/components/TopAppBar";
 
 // user to repay debt
 const user = [
@@ -90,15 +90,17 @@ export default function GroupDetail() {
   const { id } = useLocalSearchParams();
 
   return (
-    <ScrollView
-      contentContainerStyle={{
-        paddingTop: 60,
-        paddingLeft: 20,
-        paddingRight: 20,
-        paddingBottom: 20,
-        alignItems: "center",
-      }}
-    >
+    <View style={{ flex: 1, backgroundColor: "#F7F9FB" }}>
+      <TopAppBar title="Chi tiết nhóm" showBack  />
+      <ScrollView
+        contentContainerStyle={{
+          paddingTop: 16,
+          paddingLeft: 20,
+          paddingRight: 20,
+          paddingBottom: 20,
+          alignItems: "center",
+        }}
+      >
       {/* CARD */}
       <View
         style={{
@@ -439,6 +441,7 @@ export default function GroupDetail() {
           </View>
         ))}
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }

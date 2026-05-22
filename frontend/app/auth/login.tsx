@@ -7,6 +7,19 @@ import { Alert, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, Status
 import { ThemedText } from "@/components/ThemedText";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
+const MOCK_USERS = [
+  {
+    name: "Nguyen Van A",
+    email: "demo@esplit.app",
+    password: "123456",
+  },
+  {
+    name: "Tran Thi B",
+    email: "user@esplit.app",
+    password: "abcdef",
+  },
+];
+
 export default function Login() {
   const { textColor, backgroundWhite, selected } = useAppTheme();
   const [email, setEmail] = useState("");
@@ -18,7 +31,18 @@ export default function Login() {
       Alert.alert("Lỗi", "Vui lòng điền email và mật khẩu");
       return;
     }
-    Alert.alert("Đăng nhập", `Email: ${email}`);
+
+    const matchedUser = MOCK_USERS.find(
+      (user) => user.email.toLowerCase() === email.trim().toLowerCase() && user.password === password,
+    );
+
+    if (!matchedUser) {
+      Alert.alert("Lỗi", "Email hoặc mật khẩu không đúng. Hãy thử tài khoản mẫu bên dưới.");
+      return;
+    }
+
+    Alert.alert("Thành công", `Xin chào ${matchedUser.name}`);
+    router.replace("/(tabs)");
   };
 
   return (
@@ -33,6 +57,12 @@ export default function Login() {
           <View style={styles.card}>
             <ThemedText fontWeight="semibold" style={[styles.title, { color: textColor }]}>Đăng nhập tài khoản</ThemedText>
             <ThemedText style={[styles.subtitle, { color: placeholderGray }]}>Chào mừng bạn quay lại, hãy đăng nhập để tiếp tục.</ThemedText>
+
+            <View style={styles.mockBox}>
+              <ThemedText fontWeight="semibold" style={[styles.mockTitle, { color: textColor }]}>Tài khoản mẫu</ThemedText>
+              <ThemedText style={[styles.mockText, { color: placeholderGray }]}>demo@esplit.app / 123456</ThemedText>
+              <ThemedText style={[styles.mockText, { color: placeholderGray }]}>user@esplit.app / abcdef</ThemedText>
+            </View>
 
             <TextInput
               value={email}
@@ -115,6 +145,15 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 22, marginBottom: 6 },
   subtitle: { fontSize: 14, marginBottom: 18 },
+  mockBox: {
+    backgroundColor: "#F3F4F6",
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 6,
+  },
+  mockTitle: { fontSize: 13, marginBottom: 6 },
+  mockText: { fontSize: 12, lineHeight: 18 },
   input: {
     backgroundColor: "#FAFBFF",
     paddingHorizontal: 14,

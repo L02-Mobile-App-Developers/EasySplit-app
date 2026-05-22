@@ -222,7 +222,7 @@ export default function HistoryScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#F7F9FB" }}>
-      <TopAppBar title="EasySplit" showBack={false} />
+      <TopAppBar title="EasySplit" showBack={false} showSearch showSettings />
 
       {loading ? (
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>

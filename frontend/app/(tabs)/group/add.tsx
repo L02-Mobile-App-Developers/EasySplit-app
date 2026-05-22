@@ -1,4 +1,4 @@
-import Header from "@/components/header";
+import TopAppBar from "@/components/TopAppBar";
 import * as ImagePicker from "expo-image-picker";
 import React, { useState } from "react";
 import {
@@ -218,13 +218,13 @@ export default function Index() {
       {/* HEADER */}
       <ScrollView
         contentContainerStyle={{
-          paddingTop: 60,
+            paddingTop: 12,
           paddingLeft: 20,
           paddingRight: 20,
           paddingBottom: 20,
         }}
       >
-        <Header title="Tạo nhóm mới" />
+        <TopAppBar title="Tạo nhóm mới" showBack showSearch showSettings />
         {/* Upload Image */}
         <Pressable
           onPress={pickImage}

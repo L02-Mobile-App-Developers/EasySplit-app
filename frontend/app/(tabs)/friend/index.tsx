@@ -446,7 +446,7 @@ export default function FriendScreen() {
       <ScrollView
         contentContainerStyle={{
           // Increased paddingTop to match Group page spacing
-          paddingTop: 60,
+          paddingTop: 16,
           paddingLeft: 20,
           paddingRight: 20,
           paddingBottom: 20,

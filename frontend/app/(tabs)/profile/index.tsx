@@ -47,7 +47,7 @@ const ProfileScreen = () => {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: "#F7F9FB" }}>
-        <TopAppBar title="EasySplit" showBack={false} />
+        <TopAppBar title="EasySplit" showBack={false} showSearch showSettings />
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
           <ActivityIndicator size="large" color="#16A34A" />
           <Text style={{ marginTop: 12, color: "#6B7280", fontSize: 14 }}>Đang tải hồ sơ...</Text>
@@ -59,7 +59,7 @@ const ProfileScreen = () => {
   if (!profile) {
     return (
       <View style={{ flex: 1, backgroundColor: "#F7F9FB" }}>
-        <TopAppBar title="EasySplit" showBack={false} />
+        <TopAppBar title="EasySplit" showBack={false} showSearch showSettings />
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
           <Text style={{ color: "#6B7280" }}>Không thể tải dữ liệu</Text>
         </View>
@@ -69,7 +69,7 @@ const ProfileScreen = () => {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#F7F9FB" }}>
-      <TopAppBar title="EasySplit" showBack={false} />
+      <TopAppBar title="EasySplit" showBack={false} showSearch showSettings />
 
       <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
         {/* Profile Information Section */}

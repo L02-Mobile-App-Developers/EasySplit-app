@@ -1,4 +1,4 @@
-import Header from "@/components/header";
+import TopAppBar from "@/components/TopAppBar";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { AntDesign, MaterialIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -88,16 +88,15 @@ export default function AddExpenseScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#F3F4F6" }}>
+      <TopAppBar title="Thêm khoản chi" showBack   />
       <ScrollView
         contentContainerStyle={{
-          paddingTop: 60,
+           paddingTop: 12,
           paddingLeft: 16,
           paddingRight: 16,
           paddingBottom: 24,
         }}
       >
-        <Header title="Thêm khoản chi" />
-
         <View style={{ gap: 12 }}>
           <View>
             <Text style={{ color: tabIconDefault, fontSize: 12, fontWeight: "700", marginBottom: 6 }}>

@@ -1,4 +1,4 @@
-import Header from "@/components/header";
+import TopAppBar from "@/components/TopAppBar";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { AntDesign, MaterialIcons } from "@expo/vector-icons";
 import { useLocalSearchParams, router } from "expo-router";
@@ -35,9 +35,8 @@ export default function ExpenseDetail() {
 
   return (
     <View style={{ flex: 1, backgroundColor: backgroundColor }}>
-      <ScrollView contentContainerStyle={{ paddingTop: 60, paddingHorizontal: 20, paddingBottom: 40 }}>
-        <Header title="Chi tiết khoản chi" />
-
+      <TopAppBar title="Chi tiết khoản chi" showBack showSearch showSettings />
+      <ScrollView contentContainerStyle={{ paddingTop: 12, paddingHorizontal: 20, paddingBottom: 40 }}>
         <View style={{ backgroundColor: backgroundWhite, borderRadius: 12, padding: 20, marginBottom: 16 }}>
           <View style={{ alignItems: "center", marginBottom: 12 }}>
             <View style={{ width: 64, height: 64, borderRadius: 999, backgroundColor: "#ECFDF5", alignItems: "center", justifyContent: "center", marginBottom: 8 }}>

@@ -1,12 +1,12 @@
-import Header from "@/components/header";
+import { MaterialIcons } from "@expo/vector-icons";
+import TopAppBar from "@/components/TopAppBar";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { router } from "expo-router";
 import React, { useState } from "react";
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
-import { router } from "expo-router";
 
 export default function AddFriend() {
-  const { darkGreen, backgroundWhite } = useAppTheme();
+  const { darkGreen } = useAppTheme();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -17,7 +17,6 @@ export default function AddFriend() {
     }
 
     setLoading(true);
-    // Mock network delay
     setTimeout(() => {
       setLoading(false);
       Alert.alert("Thành công", `Đã gửi lời mời tới ${email}`);
@@ -27,16 +26,15 @@ export default function AddFriend() {
 
   return (
     <View style={{ flex: 1 }}>
+      <TopAppBar title="Thêm bạn" showBack showSearch showSettings />
       <ScrollView
         contentContainerStyle={{
-          paddingTop: 60,
+          paddingTop: 12,
           paddingLeft: 20,
           paddingRight: 20,
           paddingBottom: 20,
         }}
       >
-        <Header title="Thêm bạn" />
-
         <Text style={{ marginBottom: 8 }}>Email</Text>
         <TextInput
           placeholder="Nhập email bạn bè"

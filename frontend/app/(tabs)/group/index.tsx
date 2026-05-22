@@ -1,3 +1,4 @@
+import TopAppBar from "@/components/TopAppBar";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { AntDesign, EvilIcons, FontAwesome6 } from "@expo/vector-icons";
 import { useState } from "react";
@@ -93,9 +94,27 @@ export default function Index() {
     darkGreen,
   } = useAppTheme();
 
+    const handleSearch = () => {
+    console.log("Search pressed");
+    // TODO: Navigate to search screen
+  };
+
+  const handleSettings = () => {
+    console.log("Settings pressed");
+    // TODO: Navigate to settings screen
+  };
+
   return (
     // fix button
     <View style={{ flex: 1 }}>
+         <TopAppBar
+        title="EasySplit"
+        showBack={false}
+        showSearch={true}
+        showSettings={true}
+        onSearchPress={handleSearch}
+        onSettingsPress={handleSettings}
+      />
       <TouchableOpacity
         style={{
           position: "absolute",
@@ -112,13 +131,13 @@ export default function Index() {
       </TouchableOpacity>
       <ScrollView
         contentContainerStyle={{
-          paddingTop: 60,
+          paddingTop: 16,
           paddingLeft: 20,
           paddingRight: 20,
           paddingBottom: 20,
         }}
       >
-        <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 20 }}>
+        <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
           Nhóm
         </Text>
 
