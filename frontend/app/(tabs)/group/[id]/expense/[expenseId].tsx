@@ -99,7 +99,7 @@ export default function ExpenseDetail() {
         </View>
 
         <View style={{ flexDirection: "row", gap: 12, justifyContent: "center" }}>
-          <TouchableOpacity onPress={() => router.push(`edit`)} style={{ backgroundColor: "#E6EEF9", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, flex: 1, alignItems: "center" }}>
+          <TouchableOpacity onPress={() => {}} style={{ backgroundColor: "#E6EEF9", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, flex: 1, alignItems: "center" }}>
             <Text style={{ color: "#374151", fontWeight: "700" }}>Chỉnh sửa</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => { /* TODO: delete */ }} style={{ backgroundColor: "#FEE2E2", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, flex: 1, alignItems: "center" }}>

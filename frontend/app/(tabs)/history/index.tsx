@@ -114,7 +114,7 @@ const TransactionItem: React.FC<any> = ({ item, colors }) => {
         elevation: 1,
       }}
     >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
         {/* Icon or avatar */}
         {item.avatar ? (
           <Image
@@ -137,8 +137,8 @@ const TransactionItem: React.FC<any> = ({ item, colors }) => {
         )}
 
         {/* Text block */}
-        <View style={{ maxWidth: 220 }}>
-          <Text style={{ fontSize: 15, lineHeight: 20 }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ fontSize: 15, lineHeight: 20, flexShrink: 1 }}>
             {item.title.map((part: any, idx: number) => (
               <Text
                 key={idx}
@@ -161,11 +161,16 @@ const TransactionItem: React.FC<any> = ({ item, colors }) => {
       </View>
 
       {/* Amount or Chevron */}
-      <View style={{ alignItems: "flex-end" }}>
+      <View style={{ alignItems: "flex-end", marginLeft: 12, flexShrink: 0, minWidth: 74 }}>
         {item.showChevron ? (
           <MaterialIcons name="chevron-right" size={24} color="#6B7280" />
         ) : (
-          <Text style={{ color: item.amountColor || "#0F172A", fontWeight: "700" }}>
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.85}
+            style={{ color: item.amountColor || "#0F172A", fontWeight: "700", fontSize: 14 }}
+          >
             {item.amount}
           </Text>
         )}

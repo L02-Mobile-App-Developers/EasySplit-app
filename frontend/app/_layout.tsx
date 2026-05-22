@@ -2,7 +2,7 @@ import * as NavigationBar from "expo-navigation-bar";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { Platform } from "react-native";
+import { Platform, Text, TextInput } from "react-native";
 
 import {
   Inter_400Regular,
@@ -16,6 +16,12 @@ import {
 import * as SplashScreen from "expo-splash-screen";
 
 SplashScreen.preventAutoHideAsync();
+
+Text.defaultProps = Text.defaultProps ?? {};
+Text.defaultProps.style = [Text.defaultProps.style, { fontFamily: "Inter_400Regular" }];
+
+TextInput.defaultProps = TextInput.defaultProps ?? {};
+TextInput.defaultProps.style = [TextInput.defaultProps.style, { fontFamily: "Inter_400Regular" }];
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({

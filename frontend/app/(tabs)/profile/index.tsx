@@ -1,17 +1,29 @@
 import TopAppBar from "@/components/TopAppBar";
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
   ScrollView,
+  TextInput,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 
+type ProfileData = {
+  name: string;
+  email: string;
+  phone: string;
+  groups: number;
+  friends: number;
+  transactions: number;
+  avatar: { uri: string } | number;
+};
+
 // Mock profile data
-const mockProfileData = {
+const mockProfileData: ProfileData = {
   name: "Minh Nguyen",
   email: "minh@gmail.com",
   phone: "090xxxxxxx",
@@ -31,18 +43,62 @@ const fetchProfileData = () => {
 };
 
 const ProfileScreen = () => {
-  const [profile, setProfile] = useState<typeof mockProfileData | null>(null);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [draft, setDraft] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     const loadProfile = async () => {
       setLoading(true);
-      const data = await fetchProfileData() as typeof mockProfileData;
+      const data = await fetchProfileData() as ProfileData;
       setProfile(data);
+      setDraft(data);
       setLoading(false);
     };
     loadProfile();
   }, []);
+
+  const beginEditing = () => {
+    if (!profile) return;
+    setDraft(profile);
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    if (!profile) return;
+    setDraft(profile);
+    setIsEditing(false);
+  };
+
+  const handlePickAvatar = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.9,
+    });
+
+    if (!result.canceled && result.assets[0]?.uri) {
+      setDraft((current) => {
+        if (!current) return current;
+        return { ...current, avatar: { uri: result.assets[0].uri } };
+      });
+    }
+  };
+
+  const handleSaveProfile = () => {
+    if (!draft) return;
+
+    setProfile(draft);
+    setIsEditing(false);
+  };
 
   if (loading) {
     return (
@@ -75,9 +131,9 @@ const ProfileScreen = () => {
         {/* Profile Information Section */}
         <View style={{ alignItems: "center", paddingTop: 32, paddingBottom: 28 }}>
           {/* Avatar with Edit Badge */}
-          <View style={{ position: "relative", marginBottom: 16 }}>
+          <TouchableOpacity activeOpacity={0.85} onPress={isEditing ? handlePickAvatar : beginEditing} style={{ position: "relative", marginBottom: 16 }}>
             <Image
-              source={profile.avatar}
+              source={draft?.avatar || profile.avatar}
               style={{
                 width: 120,
                 height: 120,
@@ -86,7 +142,6 @@ const ProfileScreen = () => {
                 borderColor: "#16A34A",
               }}
             />
-            {/* Edit Badge */}
             <View
               style={{
                 position: "absolute",
@@ -102,20 +157,74 @@ const ProfileScreen = () => {
                 alignItems: "center",
               }}
             >
-              <MaterialIcons name="edit" size={20} color="#fff" />
+              <MaterialIcons name={isEditing ? "photo-library" : "edit"} size={20} color="#fff" />
             </View>
-          </View>
+          </TouchableOpacity>
+
+          {isEditing && (
+            <Text style={{ color: "#6B7280", fontSize: 12, marginBottom: 12 }}>
+              Chạm vào ảnh đại diện để đổi ảnh
+            </Text>
+          )}
 
           {/* User Details */}
-          <Text style={{ fontSize: 24, fontWeight: "700", color: "#0F172A", marginBottom: 6 }}>
-            {profile.name}
-          </Text>
-          <Text style={{ fontSize: 14, color: "#6B7280", marginBottom: 4 }}>
-            {profile.email}
-          </Text>
-          <Text style={{ fontSize: 14, color: "#9CA3AF" }}>
-            {profile.phone}
-          </Text>
+          {isEditing ? (
+            <View style={{ width: "100%", paddingHorizontal: 20, gap: 10 }}>
+              <TextInput
+                value={draft?.name ?? ""}
+                onChangeText={(value) => setDraft((current) => (current ? { ...current, name: value } : current))}
+                placeholder="Họ và tên"
+                placeholderTextColor="#9CA3AF"
+                style={{ backgroundColor: "#fff", borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, color: "#0F172A" }}
+              />
+              <TextInput
+                value={draft?.email ?? ""}
+                onChangeText={(value) => setDraft((current) => (current ? { ...current, email: value } : current))}
+                placeholder="Email"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                style={{ backgroundColor: "#fff", borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, color: "#0F172A" }}
+              />
+              <TextInput
+                value={draft?.phone ?? ""}
+                onChangeText={(value) => setDraft((current) => (current ? { ...current, phone: value } : current))}
+                placeholder="Số điện thoại"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="phone-pad"
+                style={{ backgroundColor: "#fff", borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, color: "#0F172A" }}
+              />
+
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={cancelEditing}
+                  style={{ flex: 1, backgroundColor: "#F3F4F6", borderRadius: 14, paddingVertical: 13, alignItems: "center" }}
+                >
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: "#374151" }}>Hủy</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={handleSaveProfile}
+                  style={{ flex: 1, backgroundColor: "#16A34A", borderRadius: 14, paddingVertical: 13, alignItems: "center" }}
+                >
+                  <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>Lưu hồ sơ</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <>
+              <Text style={{ fontSize: 24, fontWeight: "700", color: "#0F172A", marginBottom: 6 }}>
+                {profile.name}
+              </Text>
+              <Text style={{ fontSize: 14, color: "#6B7280", marginBottom: 4 }}>
+                {profile.email}
+              </Text>
+              <Text style={{ fontSize: 14, color: "#9CA3AF" }}>
+                {profile.phone}
+              </Text>
+            </>
+          )}
         </View>
 
         {/* Statistics Cards */}
@@ -202,6 +311,7 @@ const ProfileScreen = () => {
         >
           {/* Edit Profile */}
           <TouchableOpacity
+            onPress={beginEditing}
             style={{
               flexDirection: "row",
               alignItems: "center",

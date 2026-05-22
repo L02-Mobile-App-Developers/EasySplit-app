@@ -216,7 +216,7 @@ export default function Index() {
   return (
     <View>
       {/* HEADER */}
-      <TopAppBar title="Tạo nhóm mới" showBack showSearch showSettings />
+      <TopAppBar title="Tạo nhóm mới" showBack  />
       <ScrollView
         contentContainerStyle={{
             paddingTop: 12,
