@@ -216,6 +216,7 @@ export default function Index() {
   return (
     <View>
       {/* HEADER */}
+      <TopAppBar title="Tạo nhóm mới" showBack showSearch showSettings />
       <ScrollView
         contentContainerStyle={{
             paddingTop: 12,
@@ -224,7 +225,6 @@ export default function Index() {
           paddingBottom: 20,
         }}
       >
-        <TopAppBar title="Tạo nhóm mới" showBack showSearch showSettings />
         {/* Upload Image */}
         <Pressable
           onPress={pickImage}
