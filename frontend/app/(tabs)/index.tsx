@@ -73,12 +73,6 @@ const quickActions = [
     label: "Thêm bạn",
     route: "/friend/add",
   },
-  {
-    id: 31,
-    icon: <MaterialIcons name="add-card" size={24} color="#16A34A" />,
-    label: "Thêm chi",
-    route: "/transaction/add",
-  },
 ];
 
 export default function Index() {

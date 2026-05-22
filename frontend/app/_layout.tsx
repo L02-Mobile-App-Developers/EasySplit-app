@@ -41,19 +41,10 @@ export default function RootLayout() {
 
   if (!loaded && !error) return null;
 
-  // giả lập check login
-  const isLoggedIn = true;
-
   return (
     <>
       <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false }}>
-        {isLoggedIn ? (
-          <Stack.Screen name="(tabs)" />
-        ) : (
-          <Stack.Screen name="auth" />
-        )}
-      </Stack>
+      <Stack screenOptions={{ headerShown: false }} />
     </>
   );
 }
