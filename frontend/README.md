@@ -11,3 +11,7 @@
 # ICON
 
 [https://icons.expo.fyi/]
+
+# LIB
+
+`expo-secure-store` to store
