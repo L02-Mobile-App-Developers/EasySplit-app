@@ -1,8 +1,10 @@
 import * as NavigationBar from "expo-navigation-bar";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Platform, Text, TextInput } from "react-native";
+
+import LoadingScreen from "@/services/LoadingScreen";
 
 import {
   Inter_400Regular,
@@ -13,9 +15,10 @@ import {
   Inter_900Black,
   useFonts,
 } from "@expo-google-fonts/inter";
-import * as SplashScreen from "expo-splash-screen";
 
-SplashScreen.preventAutoHideAsync();
+// import * as SplashScreen from "expo-splash-screen";
+
+// SplashScreen.preventAutoHideAsync();
 
 Text.defaultProps = Text.defaultProps ?? {};
 Text.defaultProps.style = [
@@ -30,6 +33,8 @@ TextInput.defaultProps.style = [
 ];
 
 export default function RootLayout() {
+  const [appReady, setAppReady] = useState(false);
+
   const [loaded, error] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -40,9 +45,26 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (loaded || error) {
-      SplashScreen.hideAsync();
+    async function prepare() {
+      if (!loaded && !error) return;
+
+      try {
+        // load api
+        // load token
+        // load async storage
+        // fetch user
+        // ...
+
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      } catch (e) {
+        console.log(e);
+      } finally {
+        setAppReady(true);
+        // await SplashScreen.hideAsync();
+      }
     }
+
+    prepare();
   }, [loaded, error]);
 
   useEffect(() => {
@@ -51,7 +73,9 @@ export default function RootLayout() {
     }
   }, []);
 
-  if (!loaded && !error) return null;
+  if (!appReady) {
+    return <LoadingScreen />;
+  }
 
   return (
     <>
