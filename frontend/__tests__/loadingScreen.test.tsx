@@ -17,8 +17,8 @@ describe("<LoadingScreen />", () => {
   });
 
   test("renders logo image", () => {
-    const { getByRole } = render(<LoadingScreen />);
+    const { getByTestId } = render(<LoadingScreen />);
 
-    getByRole("image");
+    getByTestId("logo-image");
   });
 });
