@@ -3,9 +3,16 @@ import path from "path";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
+const nodeEnv = process.env.NODE_ENV || "development";
+const devAuthEnabled = process.env.DEV_AUTH_ENABLED === "true";
+
+if (nodeEnv === "production" && devAuthEnabled) {
+  throw new Error("DEV_AUTH_ENABLED must be false in production");
+}
+
 export const config = {
   port: parseInt(process.env.PORT || "8080", 10),
-  nodeEnv: process.env.NODE_ENV || "development",
+  nodeEnv,
 
   database: {
     url: process.env.DATABASE_URL || "postgresql://easysplit:easysplit@localhost:5432/easysplit?schema=public",
@@ -25,10 +32,22 @@ export const config = {
 
   idempotency: {
     windowHours: parseInt(process.env.IDEMPOTENCY_WINDOW_HOURS || "24", 10),
+    processingTimeoutSeconds: parseInt(
+      process.env.IDEMPOTENCY_PROCESSING_TIMEOUT_SECONDS || "30",
+      10,
+    ),
   },
 
   devAuth: {
-    enabled: process.env.DEV_AUTH_ENABLED === "true",
+    enabled: devAuthEnabled,
+  },
+
+  firebase: {
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+    serviceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
+    serviceAccountBase64: process.env.FIREBASE_SERVICE_ACCOUNT_BASE64,
   },
 } as const;
 

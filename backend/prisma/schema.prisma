@@ -12,9 +12,10 @@ datasource db {
 // ============================================================
 model User {
   id           String   @id @default(uuid()) @db.Uuid
+  firebaseUid  String?  @unique @map("firebase_uid")
   displayName  String   @map("display_name")
-  email        String   @unique
-  passwordHash String   @map("password_hash")
+  email        String?  @unique
+  passwordHash String?  @map("password_hash")
   avatarUrl    String?  @map("avatar_url")
   createdAt    DateTime @default(now()) @map("created_at")
 
@@ -228,11 +229,20 @@ model AuditLog {
 // IdempotencyKey (for idempotency tracking)
 // ============================================================
 model IdempotencyKey {
-  key       String   @id @db.VarChar(255)
-  response  Json
-  createdAt DateTime @default(now()) @map("created_at")
-  expiresAt DateTime @map("expires_at")
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  key          String   @db.VarChar(255)
+  method       String   @db.VarChar(10)
+  path         String   @db.VarChar(500)
+  requestHash  String   @map("request_hash") @db.VarChar(64)
+  responseBody Json?    @map("response_body")
+  statusCode   Int?     @map("status_code")
+  state        String   @default("processing") @db.VarChar(20)
+  createdAt    DateTime @default(now()) @map("created_at")
+  expiresAt    DateTime @map("expires_at")
 
+  @@unique([userId, key])
   @@index([expiresAt])
+  @@index([state, expiresAt])
   @@map("idempotency_keys")
 }

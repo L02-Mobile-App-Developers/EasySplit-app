@@ -3,8 +3,24 @@ import { z } from "zod";
 import { validate } from "../../middleware/validate";
 import { sendSuccess } from "../../lib/response";
 import * as authService from "./auth.service";
+import { authenticate } from "../../middleware/auth";
 
 const router = Router();
+
+// POST /auth/sync
+// Production clients send Authorization: Bearer <Firebase ID token>.
+router.post(
+  "/sync",
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = await authService.getCurrentUser(req.user!.userId);
+      sendSuccess(res, user, "User synced");
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // POST /auth/register
 const registerSchema = z.object({

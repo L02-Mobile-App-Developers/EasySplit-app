@@ -1,5 +1,9 @@
 import { prisma } from "../../lib/prisma";
-import { assertGroupMember } from "../../lib/entitlement";
+import {
+  assertGroupMember,
+  getGroupOwnerSubscription,
+  isPremiumSubscriptionActive,
+} from "../../lib/entitlement";
 import { config } from "../../config";
 
 interface HistoryFilters {
@@ -77,13 +81,10 @@ export async function getHistory(
   const limit = filters.limit ?? 20;
   const skip = (page - 1) * limit;
 
-  // Determine the subscription plan for the user
-  const subscription = await prisma.subscription.findUnique({
-    where: { userId },
-  });
+  const { subscription } = await getGroupOwnerSubscription(groupId);
   const plan = subscription?.plan ?? "free";
   const status = subscription?.status ?? "active";
-  const isPremium = plan === "premium" && status !== "expired";
+  const isPremium = isPremiumSubscriptionActive(subscription);
 
   // Build filters
   const where: Record<string, unknown> = {

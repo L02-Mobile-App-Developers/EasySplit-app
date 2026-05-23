@@ -1,0 +1,347 @@
+{
+  "info": {
+    "name": "EasySplit Backend API",
+    "description": "Postman collection for EasySplit /api/v1. Production/staging auth uses Firebase ID tokens. Set collection variables before running requests.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{firebaseIdToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080/api/v1" },
+    { "key": "firebaseIdToken", "value": "" },
+    { "key": "idempotencyKey", "value": "{{$guid}}" },
+    { "key": "groupId", "value": "" },
+    { "key": "userId", "value": "" },
+    { "key": "memberUserId", "value": "" },
+    { "key": "payerUserId", "value": "" },
+    { "key": "expenseId", "value": "" },
+    { "key": "settlementId", "value": "" },
+    { "key": "reminderId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": "{{baseUrl}}/health"
+          }
+        },
+        {
+          "name": "Ready",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": "{{baseUrl}}/ready"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Sync Firebase User",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{firebaseIdToken}}" }
+            ],
+            "url": "{{baseUrl}}/auth/sync",
+            "description": "Verifies Firebase ID token and syncs/returns the PostgreSQL user."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Me",
+      "item": [
+        {
+          "name": "Get Me",
+          "request": { "method": "GET", "url": "{{baseUrl}}/me" }
+        },
+        {
+          "name": "Update Me",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"Alex Nguyen\",\n  \"avatarUrl\": \"https://example.com/avatar.png\"\n}"
+            },
+            "url": "{{baseUrl}}/me"
+          }
+        },
+        {
+          "name": "Get Subscription",
+          "request": { "method": "GET", "url": "{{baseUrl}}/me/subscription" }
+        },
+        {
+          "name": "Get Usage",
+          "request": { "method": "GET", "url": "{{baseUrl}}/me/usage" }
+        }
+      ]
+    },
+    {
+      "name": "Groups",
+      "item": [
+        {
+          "name": "List Groups",
+          "request": { "method": "GET", "url": "{{baseUrl}}/groups" }
+        },
+        {
+          "name": "Create Group",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Da Nang Trip\",\n  \"category\": \"trip\"\n}"
+            },
+            "url": "{{baseUrl}}/groups",
+            "description": "Example: create group."
+          }
+        },
+        {
+          "name": "Get Group",
+          "request": { "method": "GET", "url": "{{baseUrl}}/groups/{{groupId}}" }
+        },
+        {
+          "name": "Update Group",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Trip\",\n  \"category\": \"trip\"\n}"
+            },
+            "url": "{{baseUrl}}/groups/{{groupId}}"
+          }
+        },
+        {
+          "name": "Close Group",
+          "request": { "method": "POST", "url": "{{baseUrl}}/groups/{{groupId}}/close" }
+        }
+      ]
+    },
+    {
+      "name": "Group Members",
+      "item": [
+        {
+          "name": "List Members",
+          "request": { "method": "GET", "url": "{{baseUrl}}/groups/{{groupId}}/members" }
+        },
+        {
+          "name": "Add Member",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{memberUserId}}\",\n  \"role\": \"member\"\n}"
+            },
+            "url": "{{baseUrl}}/groups/{{groupId}}/members"
+          }
+        },
+        {
+          "name": "Update Member Role",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"role\": \"admin\"\n}" },
+            "url": "{{baseUrl}}/groups/{{groupId}}/members/{{memberUserId}}"
+          }
+        },
+        {
+          "name": "Remove Member",
+          "request": { "method": "DELETE", "url": "{{baseUrl}}/groups/{{groupId}}/members/{{memberUserId}}" }
+        }
+      ]
+    },
+    {
+      "name": "Expenses",
+      "item": [
+        {
+          "name": "List Expenses",
+          "request": { "method": "GET", "url": "{{baseUrl}}/groups/{{groupId}}/expenses?page=1&limit=20" }
+        },
+        {
+          "name": "Create Expense",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Seafood dinner\",\n  \"amount\": 900000,\n  \"currency\": \"VND\",\n  \"paidByUserId\": \"{{payerUserId}}\",\n  \"splitMode\": \"amount\",\n  \"participants\": [\n    { \"userId\": \"{{payerUserId}}\", \"value\": 300000 },\n    { \"userId\": \"{{memberUserId}}\", \"value\": 300000 },\n    { \"userId\": \"{{userId}}\", \"value\": 300000 }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/groups/{{groupId}}/expenses",
+            "description": "Example: create expense. Idempotency-Key is required."
+          }
+        },
+        {
+          "name": "Idempotent Expense Retry",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Seafood dinner\",\n  \"amount\": 900000,\n  \"currency\": \"VND\",\n  \"paidByUserId\": \"{{payerUserId}}\",\n  \"splitMode\": \"amount\",\n  \"participants\": [\n    { \"userId\": \"{{payerUserId}}\", \"value\": 300000 },\n    { \"userId\": \"{{memberUserId}}\", \"value\": 300000 },\n    { \"userId\": \"{{userId}}\", \"value\": 300000 }\n  ]\n}"
+            },
+            "url": "{{baseUrl}}/groups/{{groupId}}/expenses",
+            "description": "Send with the same Idempotency-Key and exact same body to replay the original response."
+          }
+        },
+        {
+          "name": "Get Expense",
+          "request": { "method": "GET", "url": "{{baseUrl}}/groups/{{groupId}}/expenses/{{expenseId}}" }
+        },
+        {
+          "name": "Update Expense",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"description\": \"Updated seafood dinner\"\n}" },
+            "url": "{{baseUrl}}/groups/{{groupId}}/expenses/{{expenseId}}"
+          }
+        },
+        {
+          "name": "Delete Expense",
+          "request": { "method": "DELETE", "url": "{{baseUrl}}/groups/{{groupId}}/expenses/{{expenseId}}" }
+        }
+      ]
+    },
+    {
+      "name": "Balances",
+      "item": [
+        {
+          "name": "List Balances",
+          "request": { "method": "GET", "url": "{{baseUrl}}/groups/{{groupId}}/balances" }
+        },
+        {
+          "name": "Get My Balance",
+          "request": { "method": "GET", "url": "{{baseUrl}}/groups/{{groupId}}/balances/me" }
+        }
+      ]
+    },
+    {
+      "name": "Settlements and Smart Settle",
+      "item": [
+        {
+          "name": "Get Debts",
+          "request": { "method": "GET", "url": "{{baseUrl}}/groups/{{groupId}}/debts" }
+        },
+        {
+          "name": "Create Settlement",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fromUserId\": \"{{memberUserId}}\",\n  \"toUserId\": \"{{payerUserId}}\",\n  \"amount\": 300000,\n  \"note\": \"Paid by bank transfer\"\n}"
+            },
+            "url": "{{baseUrl}}/groups/{{groupId}}/settlements",
+            "description": "Example: create settlement. Idempotency-Key is required."
+          }
+        },
+        {
+          "name": "List Settlements",
+          "request": { "method": "GET", "url": "{{baseUrl}}/groups/{{groupId}}/settlements?page=1&limit=20" }
+        },
+        {
+          "name": "Get Settlement",
+          "request": { "method": "GET", "url": "{{baseUrl}}/groups/{{groupId}}/settlements/{{settlementId}}" }
+        },
+        {
+          "name": "Smart Settle Suggestions",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"algorithm\": \"min_transfer\",\n  \"maxTransfers\": 50\n}" },
+            "url": "{{baseUrl}}/groups/{{groupId}}/smart-settle/suggestions"
+          }
+        },
+        {
+          "name": "Group Settlement Simulate",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"mode\": \"simulate\"\n}" },
+            "url": "{{baseUrl}}/groups/{{groupId}}/group-settlement",
+            "description": "Example: preview only. Does not require Idempotency-Key."
+          }
+        },
+        {
+          "name": "Group Settlement Commit",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"mode\": \"commit\",\n  \"note\": \"Closing trip balances\"\n}" },
+            "url": "{{baseUrl}}/groups/{{groupId}}/group-settlement",
+            "description": "Example: commit. Idempotency-Key is required when mode=commit."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reminders",
+      "item": [
+        {
+          "name": "Create Reminders",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetUserIds\": [\"{{memberUserId}}\"],\n  \"channel\": \"in_app\",\n  \"messageTemplate\": \"Please settle your outstanding debt.\"\n}"
+            },
+            "url": "{{baseUrl}}/groups/{{groupId}}/reminders"
+          }
+        },
+        {
+          "name": "List Reminders",
+          "request": { "method": "GET", "url": "{{baseUrl}}/groups/{{groupId}}/reminders?page=1&limit=20" }
+        },
+        {
+          "name": "Cancel Reminder",
+          "request": { "method": "POST", "url": "{{baseUrl}}/groups/{{groupId}}/reminders/{{reminderId}}/cancel" }
+        }
+      ]
+    },
+    {
+      "name": "Activities and History",
+      "item": [
+        {
+          "name": "List Activities",
+          "request": { "method": "GET", "url": "{{baseUrl}}/groups/{{groupId}}/activities?page=1&limit=20" }
+        },
+        {
+          "name": "List History",
+          "request": { "method": "GET", "url": "{{baseUrl}}/groups/{{groupId}}/history?page=1&limit=20&type=expense" }
+        }
+      ]
+    }
+  ]
+}

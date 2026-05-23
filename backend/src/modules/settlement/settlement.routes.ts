@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { validate } from "../../middleware/validate";
+import { requireIdempotency } from "../../middleware/idempotency";
 import { sendSuccess } from "../../lib/response";
 import * as settlementService from "./settlement.service";
 
@@ -75,6 +76,7 @@ router.post(
 // POST /groups/:groupId/settlements
 router.post(
   "/settlements",
+  requireIdempotency(),
   validate({ body: createSettlementSchema }),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -82,6 +84,7 @@ router.post(
         req.params.groupId as string,
         req.user!.userId,
         req.body,
+        req.idempotencyRequestId,
       );
       sendSuccess(res, settlement, "Settlement created", undefined, 201);
     } catch (err) {
@@ -132,6 +135,7 @@ router.get(
 // POST /groups/:groupId/group-settlement
 router.post(
   "/group-settlement",
+  requireIdempotency({ requiredWhen: (req) => req.body?.mode === "commit" }),
   validate({ body: groupSettlementSchema }),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -139,6 +143,7 @@ router.post(
         req.params.groupId as string,
         req.user!.userId,
         req.body,
+        req.idempotencyRequestId,
       );
       sendSuccess(res, result, "Group settlement completed");
     } catch (err) {

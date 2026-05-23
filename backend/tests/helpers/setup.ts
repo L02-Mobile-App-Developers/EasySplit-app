@@ -1,12 +1,10 @@
-import { PrismaClient } from "@prisma/client";
-import { app } from "../../src/app";
-import { config } from "../../src/config";
-
 // Use a separate test database or mock
 // In CI, this would point to a test DB
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || "postgresql://easysplit:easysplit@localhost:5432/easysplit_test?schema=public";
 process.env.NODE_ENV = "test";
 process.env.DEV_AUTH_ENABLED = "true";
+
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -40,4 +38,4 @@ export async function closeConnection(): Promise<void> {
   await prisma.$disconnect();
 }
 
-export { app, prisma, config };
+export { prisma };

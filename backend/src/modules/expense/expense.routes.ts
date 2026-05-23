@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { validate } from "../../middleware/validate";
+import { requireIdempotency } from "../../middleware/idempotency";
 import { sendSuccess } from "../../lib/response";
 import * as expenseService from "./expense.service";
 
@@ -41,6 +42,7 @@ const paginationSchema = z.object({
 // POST /groups/:groupId/expenses
 router.post(
   "/",
+  requireIdempotency(),
   validate({ body: createExpenseSchema }),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -48,6 +50,7 @@ router.post(
         req.params.groupId as string,
         req.user!.userId,
         req.body,
+        req.idempotencyRequestId,
       );
       sendSuccess(res, result, "Expense created", undefined, 201);
     } catch (err) {
@@ -104,6 +107,7 @@ router.patch(
         req.params.expenseId as string,
         req.user!.userId,
         req.body,
+        req.idempotencyRequestId,
       );
       sendSuccess(res, result, "Expense updated");
     } catch (err) {
@@ -121,6 +125,7 @@ router.delete(
         req.params.groupId as string,
         req.params.expenseId as string,
         req.user!.userId,
+        req.idempotencyRequestId,
       );
       sendSuccess(res, result, "Expense deleted");
     } catch (err) {

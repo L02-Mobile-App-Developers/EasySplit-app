@@ -1,12 +1,16 @@
 import { prisma } from "../../lib/prisma";
 import {
   NotFoundError,
-  ForbiddenError,
   ValidationError,
+  FreeQuotaExceededError,
   PremiumRequiredError,
 } from "../../lib/errors";
 import { config } from "../../config";
 import { Prisma } from "@prisma/client";
+import {
+  assertPremiumGroup,
+  isPremiumSubscriptionActive,
+} from "../../lib/entitlement";
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -20,45 +24,12 @@ async function assertGroupMember(groupId: string, userId: string) {
   return membership;
 }
 
-async function assertPremiumGroup(groupId: string, userId: string) {
-  // Premium is based on the group owner's subscription
-  const group = await prisma.group.findUnique({
-    where: { id: groupId },
-    select: { ownerId: true },
-  });
-  if (!group) {
-    throw new NotFoundError("Group not found");
-  }
-
-  const subscription = await prisma.subscription.findUnique({
-    where: { userId: group.ownerId },
-  });
-
-  const plan = subscription?.plan ?? "free";
-  const status = subscription?.status ?? "active";
-
-  // Premium is valid if plan is premium and status is active/trialing/grace_period/canceled (not expired)
-  if (plan !== "premium") {
-    throw new PremiumRequiredError(
-      "This group requires a Premium subscription to use this feature",
-    );
-  }
-  if (status === "expired") {
-    throw new PremiumRequiredError(
-      "The Premium subscription for this group has expired",
-    );
-  }
-}
-
 async function checkSmartSettleQuota(userId: string) {
   const subscription = await prisma.subscription.findUnique({
     where: { userId },
   });
-  const plan = subscription?.plan ?? "free";
-  const status = subscription?.status ?? "active";
 
-  // Premium users have no quota
-  if (plan === "premium" && status !== "expired") {
+  if (isPremiumSubscriptionActive(subscription)) {
     return;
   }
 
@@ -76,7 +47,7 @@ async function checkSmartSettleQuota(userId: string) {
   });
 
   if (count >= config.freeTier.smartSettlePerMonth) {
-    throw new ForbiddenError(
+    throw new FreeQuotaExceededError(
       `Smart settle quota exceeded (${config.freeTier.smartSettlePerMonth}/month). Upgrade to Premium for unlimited usage.`,
     );
   }
@@ -92,6 +63,173 @@ interface Transfer {
   fromUserId: string;
   toUserId: string;
   amount: number;
+}
+
+interface LockedBalance {
+  userId: string;
+  balance: number;
+}
+
+interface LockedGroupBalance {
+  userId: string;
+  balance: number;
+}
+
+type SettlementSnapshot = {
+  id: string;
+  groupId: string;
+  fromUserId: string;
+  toUserId: string;
+  amount: number;
+  note: string | null;
+  createdBy: string;
+  createdAt: string;
+};
+
+function toInputJson(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
+function toSettlementSnapshot(settlement: {
+  id: string;
+  groupId: string;
+  fromUserId: string;
+  toUserId: string;
+  amount: number;
+  note: string | null;
+  createdBy: string;
+  createdAt: Date;
+}): SettlementSnapshot {
+  return {
+    id: settlement.id,
+    groupId: settlement.groupId,
+    fromUserId: settlement.fromUserId,
+    toUserId: settlement.toUserId,
+    amount: settlement.amount,
+    note: settlement.note,
+    createdBy: settlement.createdBy,
+    createdAt: settlement.createdAt.toISOString(),
+  };
+}
+
+async function writeFinancialAudit(
+  tx: Prisma.TransactionClient,
+  input: {
+    actorUserId: string;
+    action: string;
+    groupId: string;
+    before: unknown;
+    after: unknown;
+    requestId?: string;
+  },
+) {
+  await tx.auditLog.create({
+    data: {
+      actorUserId: input.actorUserId,
+      action: input.action,
+      entityType: "group",
+      entityId: input.groupId,
+      before: input.before === null ? Prisma.JsonNull : toInputJson(input.before),
+      after: input.after === null ? Prisma.JsonNull : toInputJson(input.after),
+      requestId: input.requestId ?? null,
+    },
+  });
+}
+
+async function lockSettlementBalances(
+  tx: Prisma.TransactionClient,
+  groupId: string,
+  fromUserId: string,
+  toUserId: string,
+): Promise<Map<string, number>> {
+  const rows = await tx.$queryRaw<LockedBalance[]>`
+    SELECT user_id AS "userId", balance
+    FROM balances
+    WHERE group_id = ${groupId}::uuid
+      AND user_id IN (${fromUserId}::uuid, ${toUserId}::uuid)
+    ORDER BY user_id
+    FOR UPDATE
+  `;
+
+  return new Map(rows.map((row) => [row.userId, row.balance]));
+}
+
+async function lockGroupBalances(
+  tx: Prisma.TransactionClient,
+  groupId: string,
+): Promise<LockedGroupBalance[]> {
+  return tx.$queryRaw<LockedGroupBalance[]>`
+    SELECT user_id AS "userId", balance
+    FROM balances
+    WHERE group_id = ${groupId}::uuid
+    ORDER BY user_id
+    FOR UPDATE
+  `;
+}
+
+function generateMinTransferSuggestions(
+  balances: Array<{ userId: string; balance: number }>,
+  maxTransfers: number = 50,
+): Transfer[] {
+  const creditors = balances
+    .filter((b) => b.balance > 0)
+    .map((b) => ({ userId: b.userId, balance: b.balance }))
+    .sort((a, b) => b.balance - a.balance);
+
+  const debtors = balances
+    .filter((b) => b.balance < 0)
+    .map((b) => ({ userId: b.userId, balance: -b.balance }))
+    .sort((a, b) => b.balance - a.balance);
+
+  const transfers: Transfer[] = [];
+  let ci = 0;
+  let di = 0;
+
+  while (ci < creditors.length && di < debtors.length && transfers.length < maxTransfers) {
+    const credit = creditors[ci];
+    const debit = debtors[di];
+    const amount = Math.min(credit.balance, debit.balance);
+
+    transfers.push({
+      fromUserId: debit.userId,
+      toUserId: credit.userId,
+      amount,
+    });
+
+    credit.balance -= amount;
+    debit.balance -= amount;
+
+    if (credit.balance === 0) ci++;
+    if (debit.balance === 0) di++;
+  }
+
+  return transfers;
+}
+
+async function assertPremiumGroupForTransaction(
+  tx: Prisma.TransactionClient,
+  groupId: string,
+) {
+  const group = await tx.group.findUnique({
+    where: { id: groupId },
+    select: {
+      owner: {
+        select: {
+          subscription: true,
+        },
+      },
+    },
+  });
+
+  if (!group) {
+    throw new NotFoundError("Group not found");
+  }
+
+  if (!isPremiumSubscriptionActive(group.owner.subscription)) {
+    throw new PremiumRequiredError(
+      "This group requires a Premium subscription to use this feature",
+    );
+  }
 }
 
 // ─── Public API ─────────────────────────────────────────────────────
@@ -178,38 +316,7 @@ export async function generateSmartSettle(
     where: { groupId },
   });
 
-  // Separate creditors (+) and debtors (−)
-  let creditors = balances
-    .filter((b: { balance: number }) => b.balance > 0)
-    .map((b: { userId: string; balance: number }) => ({ userId: b.userId, balance: b.balance }))
-    .sort((a: { balance: number }, b: { balance: number }) => b.balance - a.balance);
-
-  let debtors = balances
-    .filter((b: { balance: number }) => b.balance < 0)
-    .map((b: { userId: string; balance: number }) => ({ userId: b.userId, balance: -b.balance }))
-    .sort((a: { balance: number }, b: { balance: number }) => b.balance - a.balance);
-
-  const transfers: Transfer[] = [];
-
-  let ci = 0;
-  let di = 0;
-  while (ci < creditors.length && di < debtors.length && transfers.length < maxTransfers) {
-    const credit = creditors[ci];
-    const debit = debtors[di];
-    const amount = Math.min(credit.balance, debit.balance);
-
-    transfers.push({
-      fromUserId: debit.userId,
-      toUserId: credit.userId,
-      amount,
-    });
-
-    credit.balance -= amount;
-    debit.balance -= amount;
-
-    if (credit.balance === 0) ci++;
-    if (debit.balance === 0) di++;
-  }
+  const transfers = generateMinTransferSuggestions(balances, maxTransfers);
 
   // Ghi audit log để đếm quota (chỉ khi gọi từ endpoint chính thức)
   await prisma.auditLog.create({
@@ -242,6 +349,7 @@ export async function createSettlement(
     amount: number;
     note?: string;
   },
+  requestId?: string,
 ) {
   await assertGroupMember(groupId, userId);
 
@@ -255,55 +363,51 @@ export async function createSettlement(
     throw new ValidationError("Cannot settle with yourself");
   }
 
-  // Ensure both users are active members
-  const memberIds = new Set(
-    (
-      await prisma.groupMember.findMany({
-        where: { groupId, isActive: true },
-        select: { userId: true },
-      })
-    ).map((m: { userId: string }) => m.userId),
-  );
-
-  if (!memberIds.has(input.fromUserId)) {
-    throw new ValidationError("fromUserId is not an active group member");
-  }
-  if (!memberIds.has(input.toUserId)) {
-    throw new ValidationError("toUserId is not an active group member");
-  }
-
-  // Get current balances
-  const fromBalance = await prisma.balance.findUnique({
-    where: { groupId_userId: { groupId, userId: input.fromUserId } },
-  });
-  const toBalance = await prisma.balance.findUnique({
-    where: { groupId_userId: { groupId, userId: input.toUserId } },
-  });
-
-  const fromAmount = fromBalance?.balance ?? 0;
-  const toAmount = toBalance?.balance ?? 0;
-
-  // Validation rules from spec §8.3
-  if (fromAmount >= 0) {
-    throw new ValidationError(
-      "The payer (fromUserId) must have a negative balance (owes money)",
-    );
-  }
-  if (toAmount <= 0) {
-    throw new ValidationError(
-      "The receiver (toUserId) must have a positive balance (is owed money)",
-    );
-  }
-
-  const maxAllowed = Math.min(Math.abs(fromAmount), toAmount);
-  if (input.amount > maxAllowed) {
-    throw new ValidationError(
-      `Amount (${input.amount}) exceeds the maximum allowed settlement of ${maxAllowed}`,
-    );
-  }
-
-  // Transaction: create settlement + update balances
+  // Transaction: validate locked balances, create settlement, update balances, audit.
   const settlement = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const memberIds = new Set(
+      (
+        await tx.groupMember.findMany({
+          where: { groupId, isActive: true },
+          select: { userId: true },
+        })
+      ).map((m: { userId: string }) => m.userId),
+    );
+
+    if (!memberIds.has(input.fromUserId)) {
+      throw new ValidationError("fromUserId is not an active group member");
+    }
+    if (!memberIds.has(input.toUserId)) {
+      throw new ValidationError("toUserId is not an active group member");
+    }
+
+    const lockedBalances = await lockSettlementBalances(
+      tx,
+      groupId,
+      input.fromUserId,
+      input.toUserId,
+    );
+    const fromAmount = lockedBalances.get(input.fromUserId) ?? 0;
+    const toAmount = lockedBalances.get(input.toUserId) ?? 0;
+
+    if (fromAmount >= 0) {
+      throw new ValidationError(
+        "The payer (fromUserId) must have a negative balance (owes money)",
+      );
+    }
+    if (toAmount <= 0) {
+      throw new ValidationError(
+        "The receiver (toUserId) must have a positive balance (is owed money)",
+      );
+    }
+
+    const maxAllowed = Math.min(Math.abs(fromAmount), toAmount);
+    if (input.amount > maxAllowed) {
+      throw new ValidationError(
+        `Amount (${input.amount}) exceeds the maximum allowed settlement of ${maxAllowed}`,
+      );
+    }
+
     const created = await tx.settlement.create({
       data: {
         groupId,
@@ -316,16 +420,23 @@ export async function createSettlement(
     });
 
     // Update balances: from (+P), to (−P)
-    await tx.balance.upsert({
+    await tx.balance.update({
       where: { groupId_userId: { groupId, userId: input.fromUserId } },
-      create: { groupId, userId: input.fromUserId, balance: input.amount },
-      update: { balance: { increment: input.amount } },
+      data: { balance: { increment: input.amount } },
     });
 
-    await tx.balance.upsert({
+    await tx.balance.update({
       where: { groupId_userId: { groupId, userId: input.toUserId } },
-      create: { groupId, userId: input.toUserId, balance: -input.amount },
-      update: { balance: { increment: -input.amount } },
+      data: { balance: { increment: -input.amount } },
+    });
+
+    await writeFinancialAudit(tx, {
+      actorUserId: userId,
+      action: "settlement_created",
+      groupId,
+      before: null,
+      after: toSettlementSnapshot(created),
+      requestId,
     });
 
     return created;
@@ -412,25 +523,65 @@ export async function groupSettlement(
     mode: "simulate" | "commit";
     note?: string;
   },
+  requestId?: string,
 ) {
-  await assertGroupMember(groupId, userId);
-  await assertPremiumGroup(groupId, userId);
-
-  // Generate suggestions
-  const suggestion = await generateSmartSettle(groupId, userId, "min_transfer", 50);
-
   if (input.mode === "simulate") {
+    await assertGroupMember(groupId, userId);
+    await assertPremiumGroup(groupId, userId);
+    const suggestion = await generateSmartSettle(groupId, userId, "min_transfer", 50);
+
     return {
       mode: "simulate",
       ...suggestion,
     };
   }
 
-  // mode === "commit"
-  const settlements = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+  const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const membership = await tx.groupMember.findUnique({
+      where: { groupId_userId: { groupId, userId } },
+    });
+    if (!membership || !membership.isActive) {
+      throw new NotFoundError("Group not found");
+    }
+    await assertPremiumGroupForTransaction(tx, groupId);
+
+    const lockedBalances = await lockGroupBalances(tx, groupId);
+    const beforeBalances = lockedBalances.map((balance) => ({
+      userId: balance.userId,
+      balance: balance.balance,
+    }));
+    const transfers = generateMinTransferSuggestions(lockedBalances, 50);
+    const balanceMap = new Map(
+      lockedBalances.map((balance) => [balance.userId, balance.balance]),
+    );
     const createdSettlements = [];
 
-    for (const transfer of suggestion.transfers) {
+    for (const transfer of transfers) {
+      if (transfer.amount <= 0) {
+        throw new ValidationError("Settlement transfer amount must be greater than 0");
+      }
+
+      const fromBalance = balanceMap.get(transfer.fromUserId) ?? 0;
+      const toBalance = balanceMap.get(transfer.toUserId) ?? 0;
+
+      if (fromBalance >= 0) {
+        throw new ValidationError(
+          "The payer (fromUserId) must have a negative balance (owes money)",
+        );
+      }
+      if (toBalance <= 0) {
+        throw new ValidationError(
+          "The receiver (toUserId) must have a positive balance (is owed money)",
+        );
+      }
+
+      const maxAllowed = Math.min(Math.abs(fromBalance), toBalance);
+      if (transfer.amount > maxAllowed) {
+        throw new ValidationError(
+          `Amount (${transfer.amount}) exceeds the maximum allowed settlement of ${maxAllowed}`,
+        );
+      }
+
       const settlement = await tx.settlement.create({
         data: {
           groupId,
@@ -443,27 +594,61 @@ export async function groupSettlement(
       });
       createdSettlements.push(settlement);
 
-      // Update balances
-      await tx.balance.upsert({
+      await tx.balance.update({
         where: { groupId_userId: { groupId, userId: transfer.fromUserId } },
-        create: { groupId, userId: transfer.fromUserId, balance: transfer.amount },
-        update: { balance: { increment: transfer.amount } },
+        data: { balance: { increment: transfer.amount } },
       });
 
-      await tx.balance.upsert({
+      await tx.balance.update({
         where: { groupId_userId: { groupId, userId: transfer.toUserId } },
-        create: { groupId, userId: transfer.toUserId, balance: -transfer.amount },
-        update: { balance: { increment: -transfer.amount } },
+        data: { balance: { increment: -transfer.amount } },
       });
+
+      balanceMap.set(transfer.fromUserId, fromBalance + transfer.amount);
+      balanceMap.set(transfer.toUserId, toBalance - transfer.amount);
     }
 
-    return createdSettlements;
+    const afterBalances = await tx.balance.findMany({
+      where: { groupId },
+      orderBy: { userId: "asc" },
+    });
+
+    const balanceSum = afterBalances.reduce(
+      (sum, balance) => sum + balance.balance,
+      0,
+    );
+    if (balanceSum !== 0) {
+      throw new ValidationError("Group balance sum must remain zero");
+    }
+
+    await writeFinancialAudit(tx, {
+      actorUserId: userId,
+      action: "group_settlement_committed",
+      groupId,
+      before: {
+        balances: beforeBalances,
+        transfers,
+      },
+      after: {
+        settlements: createdSettlements.map(toSettlementSnapshot),
+        balances: afterBalances.map((balance) => ({
+          userId: balance.userId,
+          balance: balance.balance,
+        })),
+      },
+      requestId,
+    });
+
+    return {
+      totalSettlements: createdSettlements.length,
+      settlements: createdSettlements,
+    };
   });
 
   return {
     mode: "commit",
-    totalSettlements: settlements.length,
-    settlements,
+    totalSettlements: result.totalSettlements,
+    settlements: result.settlements,
     generatedAt: new Date().toISOString(),
   };
 }

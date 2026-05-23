@@ -6,6 +6,7 @@ import {
   ConflictError,
 } from "../../lib/errors";
 import { config } from "../../config";
+import { isUserPremium } from "../../lib/entitlement";
 
 interface CreateGroupInput {
   name: string;
@@ -17,19 +18,8 @@ interface UpdateGroupInput {
   category?: string;
 }
 
-function isPremiumPlan(plan: string): boolean {
-  return plan === "premium";
-}
-
 export async function createGroup(userId: string, input: CreateGroupInput) {
-  // Check subscription for free tier quota
-  const subscription = await prisma.subscription.findUnique({
-    where: { userId },
-  });
-
-  const plan = subscription?.plan ?? "free";
-
-  if (!isPremiumPlan(plan)) {
+  if (!(await isUserPremium(userId))) {
     const activeGroupCount = await prisma.group.count({
       where: { ownerId: userId, status: "active" },
     });
@@ -303,4 +293,3 @@ async function assertOwnerOrAdmin(groupId: string, userId: string) {
     throw new ForbiddenError("Insufficient permissions");
   }
 }
-

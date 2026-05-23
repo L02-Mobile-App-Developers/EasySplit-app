@@ -1,0 +1,1321 @@
+openapi: 3.0.3
+info:
+  title: EasySplit Backend API
+  version: 1.0.0
+  description: |
+    EasySplit backend API for groups, expenses, balances, settlements, reminders, and activity history.
+
+    Production/staging authentication uses Firebase Authentication. Send `Authorization: Bearer <firebase_id_token>`
+    on protected endpoints. PostgreSQL is the source of truth for financial data; Firebase is not used as the
+    financial database.
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development
+  - url: https://staging-api.example.com/api/v1
+    description: Staging placeholder
+tags:
+  - name: Health
+  - name: Auth
+  - name: Me
+  - name: Groups
+  - name: Members
+  - name: Expenses
+  - name: Balances
+  - name: Settlements
+  - name: Smart Settle
+  - name: Reminders
+  - name: Activity
+
+security:
+  - FirebaseBearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Public health check
+      security: []
+      responses:
+        "200":
+          description: Service is alive.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /ready:
+    get:
+      tags: [Health]
+      summary: Public readiness check
+      security: []
+      responses:
+        "200":
+          description: Service and database are ready.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /auth/sync:
+    post:
+      tags: [Auth]
+      summary: Sync Firebase user into PostgreSQL
+      description: Verifies the Firebase ID token and returns the internal PostgreSQL user.
+      responses:
+        "200":
+          description: User synced.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /me:
+    get:
+      tags: [Me]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserEnvelope"
+    patch:
+      tags: [Me]
+      summary: Update current user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMeInput"
+      responses:
+        "200":
+          description: Profile updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserEnvelope"
+  /me/subscription:
+    get:
+      tags: [Me]
+      summary: Get current user subscription
+      responses:
+        "200":
+          description: Subscription.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionEnvelope"
+  /me/usage:
+    get:
+      tags: [Me]
+      summary: Get current user free-tier usage
+      responses:
+        "200":
+          description: Usage.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageEnvelope"
+
+  /groups:
+    get:
+      tags: [Groups]
+      summary: List groups for current user
+      responses:
+        "200":
+          description: Groups.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Group"
+    post:
+      tags: [Groups]
+      summary: Create group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGroupInput"
+            examples:
+              createGroup:
+                $ref: "#/components/examples/CreateGroup"
+      responses:
+        "201":
+          description: Group created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupEnvelope"
+  /groups/{groupId}:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+    get:
+      tags: [Groups]
+      summary: Get group
+      responses:
+        "200":
+          description: Group.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupEnvelope"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Groups]
+      summary: Update group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateGroupInput"
+      responses:
+        "200":
+          description: Group updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupEnvelope"
+  /groups/{groupId}/close:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+    post:
+      tags: [Groups]
+      summary: Close group
+      responses:
+        "200":
+          description: Group closed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupEnvelope"
+
+  /groups/{groupId}/members:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+    get:
+      tags: [Members]
+      summary: List group members
+      responses:
+        "200":
+          description: Members.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/GroupMember"
+    post:
+      tags: [Members]
+      summary: Add group member
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddMemberInput"
+      responses:
+        "201":
+          description: Member added.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberEnvelope"
+  /groups/{groupId}/members/{userId}:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+      - $ref: "#/components/parameters/UserId"
+    patch:
+      tags: [Members]
+      summary: Update member role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMemberRoleInput"
+      responses:
+        "200":
+          description: Member role updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberEnvelope"
+    delete:
+      tags: [Members]
+      summary: Remove member
+      responses:
+        "200":
+          description: Member removed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NullEnvelope"
+
+  /groups/{groupId}/expenses:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+    get:
+      tags: [Expenses]
+      summary: List expenses
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Expenses.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpenseListEnvelope"
+    post:
+      tags: [Expenses]
+      summary: Create expense
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateExpenseInput"
+            examples:
+              createExpense:
+                $ref: "#/components/examples/CreateExpense"
+              idempotentExpenseRetry:
+                $ref: "#/components/examples/IdempotentExpenseRetry"
+      responses:
+        "201":
+          description: Expense created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpenseEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "409":
+          $ref: "#/components/responses/IdempotencyConflict"
+  /groups/{groupId}/expenses/{expenseId}:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+      - $ref: "#/components/parameters/ExpenseId"
+    get:
+      tags: [Expenses]
+      summary: Get expense
+      responses:
+        "200":
+          description: Expense.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpenseEnvelope"
+    patch:
+      tags: [Expenses]
+      summary: Update expense
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateExpenseInput"
+      responses:
+        "200":
+          description: Expense updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpenseEnvelope"
+    delete:
+      tags: [Expenses]
+      summary: Delete expense
+      responses:
+        "200":
+          description: Expense deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletedEntityEnvelope"
+
+  /groups/{groupId}/balances:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+    get:
+      tags: [Balances]
+      summary: List group balances
+      responses:
+        "200":
+          description: Balances.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalanceListEnvelope"
+  /groups/{groupId}/balances/me:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+    get:
+      tags: [Balances]
+      summary: Get current user's group balance
+      responses:
+        "200":
+          description: My balance.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalanceEnvelope"
+
+  /groups/{groupId}/debts:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+    get:
+      tags: [Settlements]
+      summary: Get simplified debt edges
+      responses:
+        "200":
+          description: Debt edges.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DebtListEnvelope"
+  /groups/{groupId}/settlements:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+    get:
+      tags: [Settlements]
+      summary: List settlements
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Settlements.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettlementListEnvelope"
+    post:
+      tags: [Settlements]
+      summary: Create manual settlement
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSettlementInput"
+            examples:
+              createSettlement:
+                $ref: "#/components/examples/CreateSettlement"
+      responses:
+        "201":
+          description: Settlement created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettlementEnvelope"
+  /groups/{groupId}/settlements/{settlementId}:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+      - $ref: "#/components/parameters/SettlementId"
+    get:
+      tags: [Settlements]
+      summary: Get settlement
+      responses:
+        "200":
+          description: Settlement.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettlementEnvelope"
+
+  /groups/{groupId}/smart-settle/suggestions:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+    post:
+      tags: [Smart Settle]
+      summary: Generate smart-settle suggestions
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SmartSettleInput"
+      responses:
+        "200":
+          description: Suggestion generated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SmartSettleEnvelope"
+  /groups/{groupId}/group-settlement:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+    post:
+      tags: [Smart Settle]
+      summary: Simulate or commit one-click group settlement
+      description: `Idempotency-Key` is required only when `mode` is `commit`.
+      parameters:
+        - $ref: "#/components/parameters/OptionalIdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupSettlementInput"
+            examples:
+              simulate:
+                $ref: "#/components/examples/GroupSettlementSimulate"
+              commit:
+                $ref: "#/components/examples/GroupSettlementCommit"
+      responses:
+        "200":
+          description: Group settlement completed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupSettlementEnvelope"
+
+  /groups/{groupId}/reminders:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+    get:
+      tags: [Reminders]
+      summary: List reminders
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Reminders.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReminderListEnvelope"
+    post:
+      tags: [Reminders]
+      summary: Create reminders
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReminderInput"
+      responses:
+        "201":
+          description: Reminders created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReminderListEnvelope"
+  /groups/{groupId}/reminders/{reminderId}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+      - $ref: "#/components/parameters/ReminderId"
+    post:
+      tags: [Reminders]
+      summary: Cancel reminder
+      responses:
+        "200":
+          description: Reminder canceled.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReminderEnvelope"
+
+  /groups/{groupId}/activities:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+    get:
+      tags: [Activity]
+      summary: List recent group activity
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Activity items.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogListEnvelope"
+  /groups/{groupId}/history:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+    get:
+      tags: [Activity]
+      summary: List group history with filters
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: actorId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [expense, settlement, reminder, member, group]
+      responses:
+        "200":
+          description: History items.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogListEnvelope"
+
+components:
+  securitySchemes:
+    FirebaseBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Firebase ID token
+      description: Firebase Authentication ID token.
+  parameters:
+    GroupId:
+      name: groupId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ExpenseId:
+      name: expenseId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SettlementId:
+      name: settlementId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ReminderId:
+      name: reminderId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+      description: Required for financial POST endpoints. Reuse the same key only for the exact same request body.
+    OptionalIdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Required when group settlement `mode` is `commit`.
+  responses:
+    Unauthorized:
+      description: Missing or invalid authentication.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    NotFound:
+      description: Resource not found or not accessible.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    ValidationError:
+      description: Validation error.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    IdempotencyConflict:
+      description: Same key used with a different request body.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+  examples:
+    CreateGroup:
+      value:
+        name: Da Nang Trip
+        category: trip
+    CreateExpense:
+      value:
+        description: Seafood dinner
+        amount: 900000
+        currency: VND
+        paidByUserId: 11111111-1111-1111-1111-111111111111
+        splitMode: amount
+        participants:
+          - userId: 11111111-1111-1111-1111-111111111111
+            value: 300000
+          - userId: 22222222-2222-2222-2222-222222222222
+            value: 300000
+          - userId: 33333333-3333-3333-3333-333333333333
+            value: 300000
+    IdempotentExpenseRetry:
+      summary: Same body with the same Idempotency-Key returns the original response.
+      value:
+        description: Seafood dinner
+        amount: 900000
+        currency: VND
+        paidByUserId: 11111111-1111-1111-1111-111111111111
+        splitMode: amount
+        participants:
+          - userId: 11111111-1111-1111-1111-111111111111
+            value: 300000
+          - userId: 22222222-2222-2222-2222-222222222222
+            value: 300000
+          - userId: 33333333-3333-3333-3333-333333333333
+            value: 300000
+    CreateSettlement:
+      value:
+        fromUserId: 22222222-2222-2222-2222-222222222222
+        toUserId: 11111111-1111-1111-1111-111111111111
+        amount: 300000
+        note: Paid by bank transfer
+    GroupSettlementSimulate:
+      value:
+        mode: simulate
+    GroupSettlementCommit:
+      value:
+        mode: commit
+        note: Closing trip balances
+  schemas:
+    SuccessEnvelope:
+      type: object
+      required: [data, message]
+      properties:
+        data: {}
+        message:
+          type: string
+        meta:
+          type: object
+          additionalProperties: true
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                  issue:
+                    type: string
+    HealthResponse:
+      type: object
+      required: [status, timestamp]
+      properties:
+        status:
+          type: string
+          example: ok
+        timestamp:
+          type: string
+          format: date-time
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        email:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    UserEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/User"
+    UpdateMeInput:
+      type: object
+      properties:
+        displayName:
+          type: string
+        avatarUrl:
+          type: string
+          nullable: true
+    Subscription:
+      type: object
+      properties:
+        plan:
+          type: string
+          enum: [free, premium]
+        status:
+          type: string
+          enum: [trialing, active, grace_period, canceled, expired]
+        currentPeriodStart:
+          type: string
+          format: date-time
+          nullable: true
+        currentPeriodEnd:
+          type: string
+          format: date-time
+          nullable: true
+    SubscriptionEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/Subscription"
+    UsageEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                groupCount:
+                  type: integer
+                smartSettleUsedThisMonth:
+                  type: integer
+                freeMaxGroups:
+                  type: integer
+                freeSmartSettlePerMonth:
+                  type: integer
+    Group:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        category:
+          type: string
+          enum: [trip, food, roommate, project, other]
+        ownerId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [active, closed]
+        role:
+          type: string
+          enum: [owner, admin, member]
+        memberCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    GroupEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/Group"
+    CreateGroupInput:
+      type: object
+      required: [name, category]
+      properties:
+        name:
+          type: string
+          maxLength: 80
+        category:
+          type: string
+          enum: [trip, food, roommate, project, other]
+    UpdateGroupInput:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 80
+        category:
+          type: string
+          enum: [trip, food, roommate, project, other]
+    GroupMember:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        email:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum: [owner, admin, member]
+        joinedAt:
+          type: string
+          format: date-time
+    AddMemberInput:
+      type: object
+      required: [userId]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [admin, member]
+          default: member
+    UpdateMemberRoleInput:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [admin, member]
+    MemberEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/GroupMember"
+    NullEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              nullable: true
+    ParticipantInput:
+      type: object
+      required: [userId, value]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        value:
+          type: integer
+          minimum: 0
+    CreateExpenseInput:
+      type: object
+      required: [description, amount, paidByUserId, splitMode, participants]
+      properties:
+        description:
+          type: string
+          maxLength: 255
+        amount:
+          type: integer
+          minimum: 1
+          description: Integer VND amount.
+        currency:
+          type: string
+          default: VND
+        paidByUserId:
+          type: string
+          format: uuid
+        splitMode:
+          type: string
+          enum: [equal, amount, percent, weight]
+        participants:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ParticipantInput"
+    UpdateExpenseInput:
+      type: object
+      properties:
+        description:
+          type: string
+          maxLength: 255
+        amount:
+          type: integer
+          minimum: 1
+        currency:
+          type: string
+        paidByUserId:
+          type: string
+          format: uuid
+        splitMode:
+          type: string
+          enum: [equal, amount, percent, weight]
+        participants:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ParticipantInput"
+    Expense:
+      type: object
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+          format: uuid
+        groupId:
+          type: string
+          format: uuid
+        description:
+          type: string
+        amount:
+          type: integer
+        currency:
+          type: string
+        paidByUserId:
+          type: string
+          format: uuid
+        splitMode:
+          type: string
+        createdBy:
+          type: string
+          format: uuid
+    ExpenseEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/Expense"
+    ExpenseListEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Expense"
+            meta:
+              $ref: "#/components/schemas/PaginationMeta"
+    DeletedEntityEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+    Balance:
+      type: object
+      properties:
+        groupId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        balance:
+          type: integer
+    BalanceEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/Balance"
+    BalanceListEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Balance"
+    Transfer:
+      type: object
+      properties:
+        fromUserId:
+          type: string
+          format: uuid
+        toUserId:
+          type: string
+          format: uuid
+        amount:
+          type: integer
+    DebtListEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Transfer"
+    CreateSettlementInput:
+      type: object
+      required: [fromUserId, toUserId, amount]
+      properties:
+        fromUserId:
+          type: string
+          format: uuid
+        toUserId:
+          type: string
+          format: uuid
+        amount:
+          type: integer
+          minimum: 1
+        note:
+          type: string
+          maxLength: 255
+    Settlement:
+      type: object
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+          format: uuid
+        groupId:
+          type: string
+          format: uuid
+        fromUserId:
+          type: string
+          format: uuid
+        toUserId:
+          type: string
+          format: uuid
+        amount:
+          type: integer
+        note:
+          type: string
+          nullable: true
+    SettlementEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/Settlement"
+    SettlementListEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Settlement"
+            meta:
+              $ref: "#/components/schemas/PaginationMeta"
+    SmartSettleInput:
+      type: object
+      properties:
+        algorithm:
+          type: string
+          enum: [min_transfer]
+          default: min_transfer
+        maxTransfers:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+    SmartSettle:
+      type: object
+      properties:
+        transfers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Transfer"
+        totalTransfers:
+          type: integer
+        generatedAt:
+          type: string
+          format: date-time
+    SmartSettleEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/SmartSettle"
+    GroupSettlementInput:
+      type: object
+      required: [mode]
+      properties:
+        mode:
+          type: string
+          enum: [simulate, commit]
+        note:
+          type: string
+          maxLength: 255
+    GroupSettlementEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              additionalProperties: true
+    CreateReminderInput:
+      type: object
+      required: [targetUserIds]
+      properties:
+        targetUserIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            format: uuid
+        channel:
+          type: string
+          enum: [in_app, email, sms]
+          default: in_app
+        messageTemplate:
+          type: string
+          maxLength: 500
+        scheduledAt:
+          type: string
+          format: date-time
+    Reminder:
+      type: object
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+          format: uuid
+        groupId:
+          type: string
+          format: uuid
+        targetUserId:
+          type: string
+          format: uuid
+        status:
+          type: string
+        message:
+          type: string
+    ReminderEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/Reminder"
+    ReminderListEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Reminder"
+            meta:
+              $ref: "#/components/schemas/PaginationMeta"
+    AuditLog:
+      type: object
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+          format: uuid
+        actorUserId:
+          type: string
+          format: uuid
+        action:
+          type: string
+        entityType:
+          type: string
+        entityId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+    AuditLogListEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/AuditLog"
+            meta:
+              type: object
+              additionalProperties: true
+    PaginationMeta:
+      type: object
+      properties:
+        pagination:
+          type: object
+          properties:
+            page:
+              type: integer
+            limit:
+              type: integer
+            total:
+              type: integer
+            totalPages:
+              type: integer
