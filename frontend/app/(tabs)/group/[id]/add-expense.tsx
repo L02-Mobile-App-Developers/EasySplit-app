@@ -2,7 +2,7 @@ import TopAppBar from "@/components/TopAppBar";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { AntDesign, MaterialIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Alert,
   Image,
@@ -40,15 +40,19 @@ const splitModes = ["CHIA ĐỀU", "SỐ TIỀN", "%"] as const;
 
 export default function AddExpenseScreen() {
   const { id } = useLocalSearchParams();
-  const { darkGreen, lightGray, backgroundWhite, textColor, tabIconDefault } = useAppTheme();
+  const { darkGreen, lightGray, backgroundWhite, textColor, tabIconDefault } =
+    useAppTheme();
 
   const [expenseName, setExpenseName] = useState("Ăn trưa BBQ");
   const [amount, setAmount] = useState("850000");
   const [payer, setPayer] = useState("Bạn (Khoa)");
   const [dateTime, setDateTime] = useState("Hôm nay, 12:30");
   const [note, setNote] = useState("");
-  const [splitMode, setSplitMode] = useState<(typeof splitModes)[number]>("CHIA ĐỀU");
-  const [selectedParticipantIds, setSelectedParticipantIds] = useState<number[]>(participants.map((item) => item.id));
+  const [splitMode, setSplitMode] =
+    useState<(typeof splitModes)[number]>("CHIA ĐỀU");
+  const [selectedParticipantIds, setSelectedParticipantIds] = useState<
+    number[]
+  >(participants.map((item) => item.id));
 
   const parsedAmount = Number(amount.replace(/[^0-9]/g, "")) || 0;
   const selectedCount = selectedParticipantIds.length || 1;
@@ -88,10 +92,10 @@ export default function AddExpenseScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#F3F4F6" }}>
-      <TopAppBar title="Thêm khoản chi" showBack   />
+      <TopAppBar title="Thêm khoản chi" showBack />
       <ScrollView
         contentContainerStyle={{
-           paddingTop: 12,
+          paddingTop: 12,
           paddingLeft: 16,
           paddingRight: 16,
           paddingBottom: 24,
@@ -99,7 +103,14 @@ export default function AddExpenseScreen() {
       >
         <View style={{ gap: 12 }}>
           <View>
-            <Text style={{ color: tabIconDefault, fontSize: 12, fontWeight: "700", marginBottom: 6 }}>
+            <Text
+              style={{
+                color: tabIconDefault,
+                fontSize: 12,
+                fontWeight: "700",
+                marginBottom: 6,
+              }}
+            >
               TÊN KHOẢN CHI
             </Text>
             <TextInput
@@ -119,7 +130,14 @@ export default function AddExpenseScreen() {
           </View>
 
           <View>
-            <Text style={{ color: tabIconDefault, fontSize: 12, fontWeight: "700", marginBottom: 6 }}>
+            <Text
+              style={{
+                color: tabIconDefault,
+                fontSize: 12,
+                fontWeight: "700",
+                marginBottom: 6,
+              }}
+            >
               SỐ TIỀN
             </Text>
             <View
@@ -147,12 +165,28 @@ export default function AddExpenseScreen() {
                   padding: 0,
                 }}
               />
-              <Text style={{ fontSize: 18, fontWeight: "700", color: darkGreen, marginLeft: 12 }}>đ</Text>
+              <Text
+                style={{
+                  fontSize: 18,
+                  fontWeight: "700",
+                  color: darkGreen,
+                  marginLeft: 12,
+                }}
+              >
+                đ
+              </Text>
             </View>
           </View>
 
           <View>
-            <Text style={{ color: tabIconDefault, fontSize: 12, fontWeight: "700", marginBottom: 6 }}>
+            <Text
+              style={{
+                color: tabIconDefault,
+                fontSize: 12,
+                fontWeight: "700",
+                marginBottom: 6,
+              }}
+            >
               NGƯỜI TRẢ
             </Text>
             <Pressable
@@ -166,19 +200,38 @@ export default function AddExpenseScreen() {
                 justifyContent: "space-between",
               }}
             >
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+              >
                 <Image
-                  source={{ uri: "https://randomuser.me/api/portraits/men/1.jpg" }}
+                  source={{
+                    uri: "https://randomuser.me/api/portraits/men/1.jpg",
+                  }}
                   style={{ width: 34, height: 34, borderRadius: 999 }}
                 />
-                <Text style={{ fontSize: 16, color: textColor, fontWeight: "600" }}>{payer}</Text>
+                <Text
+                  style={{ fontSize: 16, color: textColor, fontWeight: "600" }}
+                >
+                  {payer}
+                </Text>
               </View>
-              <MaterialIcons name="keyboard-arrow-down" size={22} color={tabIconDefault} />
+              <MaterialIcons
+                name="keyboard-arrow-down"
+                size={22}
+                color={tabIconDefault}
+              />
             </Pressable>
           </View>
 
           <View>
-            <Text style={{ color: tabIconDefault, fontSize: 12, fontWeight: "700", marginBottom: 6 }}>
+            <Text
+              style={{
+                color: tabIconDefault,
+                fontSize: 12,
+                fontWeight: "700",
+                marginBottom: 6,
+              }}
+            >
               NGÀY GIỜ
             </Text>
             <Pressable
@@ -192,13 +245,28 @@ export default function AddExpenseScreen() {
                 justifyContent: "space-between",
               }}
             >
-              <Text style={{ fontSize: 16, color: textColor, fontWeight: "600" }}>{dateTime}</Text>
-              <MaterialIcons name="access-time" size={18} color={tabIconDefault} />
+              <Text
+                style={{ fontSize: 16, color: textColor, fontWeight: "600" }}
+              >
+                {dateTime}
+              </Text>
+              <MaterialIcons
+                name="access-time"
+                size={18}
+                color={tabIconDefault}
+              />
             </Pressable>
           </View>
 
           <View>
-            <Text style={{ color: tabIconDefault, fontSize: 12, fontWeight: "700", marginBottom: 6 }}>
+            <Text
+              style={{
+                color: tabIconDefault,
+                fontSize: 12,
+                fontWeight: "700",
+                marginBottom: 6,
+              }}
+            >
               GHI CHÚ
             </Text>
             <TextInput
@@ -221,16 +289,41 @@ export default function AddExpenseScreen() {
           </View>
 
           <View style={{ marginTop: 6 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-              <Text style={{ fontSize: 16, fontWeight: "700", color: textColor }}>Người tham gia</Text>
-              <Text style={{ fontSize: 16, fontWeight: "700", color: darkGreen }}>{selectedParticipantIds.length} NGƯỜI</Text>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 10,
+              }}
+            >
+              <Text
+                style={{ fontSize: 16, fontWeight: "700", color: textColor }}
+              >
+                Người tham gia
+              </Text>
+              <Text
+                style={{ fontSize: 16, fontWeight: "700", color: darkGreen }}
+              >
+                {selectedParticipantIds.length} NGƯỜI
+              </Text>
             </View>
 
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 8 }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 10, paddingRight: 8 }}
+            >
               {participants.map((participant) => {
-                const isSelected = selectedParticipantIds.includes(participant.id);
+                const isSelected = selectedParticipantIds.includes(
+                  participant.id,
+                );
                 return (
-                  <Pressable key={participant.id} onPress={() => toggleParticipant(participant.id)} style={{ alignItems: "center" }}>
+                  <Pressable
+                    key={participant.id}
+                    onPress={() => toggleParticipant(participant.id)}
+                    style={{ alignItems: "center" }}
+                  >
                     <View
                       style={{
                         width: 64,
@@ -242,7 +335,14 @@ export default function AddExpenseScreen() {
                         backgroundColor: backgroundWhite,
                       }}
                     >
-                      <Image source={{ uri: participant.avatar }} style={{ width: "100%", height: "100%", borderRadius: 14 }} />
+                      <Image
+                        source={{ uri: participant.avatar }}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          borderRadius: 14,
+                        }}
+                      />
                       {isSelected && (
                         <View
                           style={{
@@ -261,7 +361,16 @@ export default function AddExpenseScreen() {
                         </View>
                       )}
                     </View>
-                    <Text style={{ marginTop: 8, fontSize: 12, fontWeight: "700", color: textColor }}>{participant.name}</Text>
+                    <Text
+                      style={{
+                        marginTop: 8,
+                        fontSize: 12,
+                        fontWeight: "700",
+                        color: textColor,
+                      }}
+                    >
+                      {participant.name}
+                    </Text>
                   </Pressable>
                 );
               })}
@@ -285,8 +394,24 @@ export default function AddExpenseScreen() {
           </View>
 
           <View style={{ marginTop: 10 }}>
-            <Text style={{ fontSize: 16, fontWeight: "700", color: textColor, marginBottom: 10 }}>Cách chia</Text>
-            <View style={{ flexDirection: "row", backgroundColor: lightGray, borderRadius: 16, padding: 4 }}>
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: "700",
+                color: textColor,
+                marginBottom: 10,
+              }}
+            >
+              Cách chia
+            </Text>
+            <View
+              style={{
+                flexDirection: "row",
+                backgroundColor: lightGray,
+                borderRadius: 16,
+                padding: 4,
+              }}
+            >
               {splitModes.map((mode) => {
                 const active = splitMode === mode;
                 return (
@@ -301,7 +426,15 @@ export default function AddExpenseScreen() {
                       alignItems: "center",
                     }}
                   >
-                    <Text style={{ color: active ? "white" : textColor, fontWeight: "700", fontSize: 14 }}>{mode}</Text>
+                    <Text
+                      style={{
+                        color: active ? "white" : textColor,
+                        fontWeight: "700",
+                        fontSize: 14,
+                      }}
+                    >
+                      {mode}
+                    </Text>
                   </Pressable>
                 );
               })}
@@ -317,14 +450,34 @@ export default function AddExpenseScreen() {
               gap: 12,
             }}
           >
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
               <Text style={{ color: textColor, fontSize: 15 }}>Tổng tiền</Text>
-              <Text style={{ color: textColor, fontSize: 15, fontWeight: "700" }}>{formatCurrency(parsedAmount)}</Text>
+              <Text
+                style={{ color: textColor, fontSize: 15, fontWeight: "700" }}
+              >
+                {formatCurrency(parsedAmount)}
+              </Text>
             </View>
             <View style={{ height: 1, backgroundColor: "#D9E3DC" }} />
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <Text style={{ color: textColor, fontSize: 15 }}>Mỗi người ({selectedCount})</Text>
-              <Text style={{ color: darkGreen, fontSize: 16, fontWeight: "700" }}>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ color: textColor, fontSize: 15 }}>
+                Mỗi người ({selectedCount})
+              </Text>
+              <Text
+                style={{ color: darkGreen, fontSize: 16, fontWeight: "700" }}
+              >
                 {formatCurrency(perPersonAmount)}
               </Text>
             </View>
@@ -344,7 +497,9 @@ export default function AddExpenseScreen() {
             })}
           >
             <AntDesign name="save" size={18} color="white" />
-            <Text style={{ color: "white", fontWeight: "800", fontSize: 16 }}>Lưu khoản chi</Text>
+            <Text style={{ color: "white", fontWeight: "800", fontSize: 16 }}>
+              Lưu khoản chi
+            </Text>
           </Pressable>
         </View>
       </ScrollView>

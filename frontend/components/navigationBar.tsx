@@ -1,7 +1,13 @@
 import { Entypo, Ionicons } from "@expo/vector-icons";
 import { router, usePathname } from "expo-router";
 import { useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -62,7 +68,11 @@ export default function NavigationBar() {
     <View
       style={[
         styles.container,
-        { backgroundColor: backgroundColor, paddingBottom: (insets.bottom || 0) + 12 },
+        {
+          backgroundColor: backgroundColor,
+          paddingBottom:
+            (insets.bottom || 0) + (Platform.OS === "android" ? 12 : -12),
+        },
       ]}
       onLayout={(e) => {
         setContainerWidth(e.nativeEvent.layout.width);

@@ -1,8 +1,18 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import React, { useState } from "react";
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StatusBar, StyleSheet, TextInput, TouchableOpacity, View } from "react-native";
+import { useState } from "react";
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/ThemedText";
@@ -34,11 +44,16 @@ export default function Login() {
     }
 
     const matchedUser = MOCK_USERS.find(
-      (user) => user.email.toLowerCase() === email.trim().toLowerCase() && user.password === password,
+      (user) =>
+        user.email.toLowerCase() === email.trim().toLowerCase() &&
+        user.password === password,
     );
 
     if (!matchedUser) {
-      Alert.alert("Lỗi", "Email hoặc mật khẩu không đúng. Hãy thử tài khoản mẫu bên dưới.");
+      Alert.alert(
+        "Lỗi",
+        "Email hoặc mật khẩu không đúng. Hãy thử tài khoản mẫu bên dưới.",
+      );
       return;
     }
 
@@ -47,22 +62,48 @@ export default function Login() {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: backgroundWhite }]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: backgroundWhite }]}
+    >
       <StatusBar barStyle="dark-content" />
       <KeyboardAvoidingView behavior="padding" style={styles.flex}>
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.brandWrap}>
-            <Image source={require("../../assets/images/logo-removebg.png")} style={styles.logo} contentFit="contain" />
+            <Image
+              source={require("../../assets/images/logo-removebg.png")}
+              style={styles.logo}
+              contentFit="contain"
+            />
           </View>
 
           <View style={styles.card}>
-            <ThemedText fontWeight="semibold" style={[styles.title, { color: textColor }]}>Đăng nhập tài khoản</ThemedText>
-            <ThemedText style={[styles.subtitle, { color: placeholderGray }]}>Chào mừng bạn quay lại, hãy đăng nhập để tiếp tục.</ThemedText>
+            <ThemedText
+              fontWeight="semibold"
+              style={[styles.title, { color: textColor }]}
+            >
+              Đăng nhập tài khoản
+            </ThemedText>
+            <ThemedText style={[styles.subtitle, { color: placeholderGray }]}>
+              Chào mừng bạn quay lại, hãy đăng nhập để tiếp tục.
+            </ThemedText>
 
             <View style={styles.mockBox}>
-              <ThemedText fontWeight="semibold" style={[styles.mockTitle, { color: textColor }]}>Tài khoản mẫu</ThemedText>
-              <ThemedText style={[styles.mockText, { color: placeholderGray }]}>demo@esplit.app / 123456</ThemedText>
-              <ThemedText style={[styles.mockText, { color: placeholderGray }]}>user@esplit.app / abcdef</ThemedText>
+              <ThemedText
+                fontWeight="semibold"
+                style={[styles.mockTitle, { color: textColor }]}
+              >
+                Tài khoản mẫu
+              </ThemedText>
+              <ThemedText style={[styles.mockText, { color: placeholderGray }]}>
+                demo@esplit.app / 123456
+              </ThemedText>
+              <ThemedText style={[styles.mockText, { color: placeholderGray }]}>
+                user@esplit.app / abcdef
+              </ThemedText>
             </View>
 
             <TextInput
@@ -84,17 +125,35 @@ export default function Login() {
               style={styles.input}
             />
 
-            <TouchableOpacity activeOpacity={0.85} onPress={handleLogin} style={[styles.button, { backgroundColor: brandGreen }]}>
-              <ThemedText fontWeight="semibold" style={styles.buttonText}>Đăng nhập</ThemedText>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={handleLogin}
+              style={[styles.button, { backgroundColor: brandGreen }]}
+            >
+              <ThemedText fontWeight="semibold" style={styles.buttonText}>
+                Đăng nhập
+              </ThemedText>
             </TouchableOpacity>
 
-            <TouchableOpacity activeOpacity={0.8} onPress={() => router.push("/auth/forgot-password")} style={styles.linkRow}>
-              <ThemedText style={[styles.forgotLink, { color: placeholderGray }]}>Quên mật khẩu?</ThemedText>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => router.push("/auth/forgot-password")}
+              style={styles.linkRow}
+            >
+              <ThemedText
+                style={[styles.forgotLink, { color: placeholderGray }]}
+              >
+                Quên mật khẩu?
+              </ThemedText>
             </TouchableOpacity>
 
             <View style={styles.dividerRow}>
               <View style={styles.divider} />
-              <ThemedText style={[styles.dividerText, { color: placeholderGray }]}>Hoặc đăng nhập bằng</ThemedText>
+              <ThemedText
+                style={[styles.dividerText, { color: placeholderGray }]}
+              >
+                Hoặc đăng nhập bằng
+              </ThemedText>
               <View style={styles.divider} />
             </View>
 
@@ -104,15 +163,36 @@ export default function Login() {
                 { name: "logo-facebook", color: "#1877F2" },
                 { name: "logo-twitter", color: "#1DA1F2" },
               ].map((item) => (
-                <TouchableOpacity key={item.name} activeOpacity={0.85} style={styles.socialButton}>
-                  <Ionicons name={item.name as keyof typeof Ionicons.glyphMap} size={22} color={item.color} />
+                <TouchableOpacity
+                  key={item.name}
+                  activeOpacity={0.85}
+                  style={styles.socialButton}
+                >
+                  <Ionicons
+                    name={item.name as keyof typeof Ionicons.glyphMap}
+                    size={22}
+                    color={item.color}
+                  />
                 </TouchableOpacity>
               ))}
             </View>
 
-            <TouchableOpacity activeOpacity={0.8} onPress={() => router.replace("/auth/register")} style={styles.footerLinkWrap}>
-              <ThemedText style={[styles.footerText, { color: placeholderGray }]}>Bạn chưa có tài khoản? </ThemedText>
-              <ThemedText fontWeight="semibold" style={[styles.footerText, { color: brandGreen }]}>Đăng ký</ThemedText>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => router.replace("/auth/register")}
+              style={styles.footerLinkWrap}
+            >
+              <ThemedText
+                style={[styles.footerText, { color: placeholderGray }]}
+              >
+                Bạn chưa có tài khoản?{" "}
+              </ThemedText>
+              <ThemedText
+                fontWeight="semibold"
+                style={[styles.footerText, { color: brandGreen }]}
+              >
+                Đăng ký
+              </ThemedText>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -124,7 +204,12 @@ export default function Login() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   flex: { flex: 1 },
-  scrollContent: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 24, paddingVertical: 28 },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 28,
+  },
   brandWrap: { alignItems: "center", marginBottom: 18 },
   logo: { width: 220, height: 90 },
   card: {
@@ -179,7 +264,12 @@ const styles = StyleSheet.create({
   buttonText: { color: "white" },
   linkRow: { alignItems: "center", marginTop: 14 },
   forgotLink: { fontSize: 13 },
-  dividerRow: { flexDirection: "row", alignItems: "center", marginTop: 22, marginBottom: 16 },
+  dividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 22,
+    marginBottom: 16,
+  },
   divider: { flex: 1, height: 1, backgroundColor: "#EBEEF6" },
   dividerText: { marginHorizontal: 12, fontSize: 12 },
   socialRow: { flexDirection: "row", justifyContent: "space-between", gap: 10 },
@@ -201,6 +291,11 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  footerLinkWrap: { flexDirection: "row", justifyContent: "center", alignItems: "center", marginTop: 18 },
+  footerLinkWrap: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 18,
+  },
   footerText: { fontSize: 13 },
 });

@@ -18,10 +18,16 @@ import * as SplashScreen from "expo-splash-screen";
 SplashScreen.preventAutoHideAsync();
 
 Text.defaultProps = Text.defaultProps ?? {};
-Text.defaultProps.style = [Text.defaultProps.style, { fontFamily: "Inter_400Regular" }];
+Text.defaultProps.style = [
+  Text.defaultProps.style,
+  { fontFamily: "Inter_400Regular" },
+];
 
 TextInput.defaultProps = TextInput.defaultProps ?? {};
-TextInput.defaultProps.style = [TextInput.defaultProps.style, { fontFamily: "Inter_400Regular" }];
+TextInput.defaultProps.style = [
+  TextInput.defaultProps.style,
+  { fontFamily: "Inter_400Regular" },
+];
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({

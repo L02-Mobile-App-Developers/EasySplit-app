@@ -216,13 +216,13 @@ export default function Index() {
   return (
     <View>
       {/* HEADER */}
-      <TopAppBar title="Tạo nhóm mới" showBack  />
+      <TopAppBar title="Tạo nhóm mới" showBack />
       <ScrollView
         contentContainerStyle={{
-            paddingTop: 12,
+          paddingTop: 12,
           paddingLeft: 20,
           paddingRight: 20,
-          paddingBottom: 20,
+          paddingBottom: 120,
         }}
       >
         {/* Upload Image */}

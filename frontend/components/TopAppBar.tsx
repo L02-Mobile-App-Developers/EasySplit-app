@@ -2,7 +2,14 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import { EvilIcons, MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { ReactNode } from "react";
-import { Pressable, StatusBar, StyleSheet, Text, View } from "react-native";
+import {
+  Platform,
+  Pressable,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 interface TopAppBarProps {
@@ -32,17 +39,36 @@ const TopAppBar: React.FC<TopAppBarProps> = ({
   return (
     <>
       <StatusBar barStyle="dark-content" backgroundColor={backgroundWhite} />
-      <SafeAreaView edges={["top"]} style={[styles.safeArea, { backgroundColor: backgroundWhite, borderBottomColor: lightGray }]}>
+      <SafeAreaView
+        edges={["top"]}
+        style={[
+          styles.safeArea,
+          {
+            backgroundColor: backgroundWhite,
+            borderBottomColor: lightGray,
+            marginTop: Platform.OS === "ios" ? -16 : 0,
+          },
+        ]}
+      >
         <View style={styles.container}>
           <View style={styles.leftSection}>
             {showBack && (
-              <Pressable onPress={handleBackPress} style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
+              <Pressable
+                onPress={handleBackPress}
+                style={({ pressed }) => [
+                  styles.iconButton,
+                  pressed && styles.pressed,
+                ]}
+              >
                 <MaterialIcons name="arrow-back" size={22} color={darkGreen} />
               </Pressable>
             )}
 
             <View style={styles.titleWrap}>
-              <Text style={[styles.title, { color: darkGreen }]} numberOfLines={1}>
+              <Text
+                style={[styles.title, { color: darkGreen }]}
+                numberOfLines={1}
+              >
                 {title}
               </Text>
             </View>
@@ -51,12 +77,24 @@ const TopAppBar: React.FC<TopAppBarProps> = ({
           <View style={styles.rightSection}>
             {rightContent}
             {showSearch && (
-              <Pressable onPress={onSearchPress} style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
+              <Pressable
+                onPress={onSearchPress}
+                style={({ pressed }) => [
+                  styles.iconButton,
+                  pressed && styles.pressed,
+                ]}
+              >
                 <EvilIcons name="search" size={26} color={darkGreen} />
               </Pressable>
             )}
             {showSettings && (
-              <Pressable onPress={onSettingsPress} style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
+              <Pressable
+                onPress={onSettingsPress}
+                style={({ pressed }) => [
+                  styles.iconButton,
+                  pressed && styles.pressed,
+                ]}
+              >
                 <MaterialIcons name="settings" size={22} color={darkGreen} />
               </Pressable>
             )}
