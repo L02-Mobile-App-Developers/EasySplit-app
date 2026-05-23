@@ -1,8 +1,15 @@
 import crypto from "crypto";
 import { NextFunction, Request, Response } from "express";
-import { Prisma } from "@prisma/client";
 import { config } from "../config";
-import { prisma } from "../lib/prisma";
+import {
+  cleanForFirestore,
+  collectionNames,
+  collectionRef,
+  docRef,
+  getDoc,
+  idempotencyId,
+  IdempotencyKey,
+} from "../lib/firestore-db";
 import {
   IdempotencyConflictError,
   ValidationError,
@@ -50,10 +57,6 @@ function hashRequest(req: Request): string {
   return crypto.createHash("sha256").update(hashInput).digest("hex");
 }
 
-function toInputJson(value: unknown): Prisma.InputJsonValue {
-  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
-}
-
 function expiresAtFromNow(): Date {
   return new Date(Date.now() + config.idempotency.windowHours * 60 * 60 * 1000);
 }
@@ -70,11 +73,13 @@ function sleep(ms: number): Promise<void> {
 
 async function waitForCompletedResponse(userId: string, key: string) {
   const deadline = Date.now() + WAIT_TIMEOUT_MS;
+  const id = idempotencyId(userId, key);
 
   while (Date.now() < deadline) {
-    const row = await prisma.idempotencyKey.findUnique({
-      where: { userId_key: { userId, key } },
-    });
+    const row = await getDoc<IdempotencyKey>(
+      collectionNames.idempotencyKeys,
+      id,
+    );
 
     if (
       row?.state === COMPLETED_STATE &&
@@ -95,10 +100,10 @@ function isStaleProcessing(row: { state: string; createdAt: Date }): boolean {
 }
 
 async function markStaleProcessingFailed(id: string) {
-  await prisma.idempotencyKey.update({
-    where: { id },
-    data: { state: FAILED_STATE },
-  });
+  await docRef(collectionNames.idempotencyKeys, id).set(
+    cleanForFirestore({ state: FAILED_STATE }),
+    { merge: true },
+  );
 }
 
 async function replayOrRejectExisting(
@@ -108,18 +113,18 @@ async function replayOrRejectExisting(
   requestHash: string,
 ): Promise<boolean> {
   const userId = req.user!.userId;
-  const existing = await prisma.idempotencyKey.findUnique({
-    where: { userId_key: { userId, key } },
-  });
+  const id = idempotencyId(userId, key);
+  const existing = await getDoc<IdempotencyKey>(
+    collectionNames.idempotencyKeys,
+    id,
+  );
 
   if (!existing) {
     return false;
   }
 
   if (existing.expiresAt <= new Date()) {
-    await prisma.idempotencyKey.delete({
-      where: { id: existing.id },
-    });
+    await docRef(collectionNames.idempotencyKeys, id).delete();
     return false;
   }
 
@@ -130,7 +135,7 @@ async function replayOrRejectExisting(
   }
 
   if (isStaleProcessing(existing)) {
-    await markStaleProcessingFailed(existing.id);
+    await markStaleProcessingFailed(id);
     throw new ValidationError(
       "A previous request with this Idempotency-Key did not complete; check resource state and retry with a new key",
       [{ field: "Idempotency-Key", issue: "stale_processing" }],
@@ -156,26 +161,38 @@ async function replayOrRejectExisting(
 }
 
 async function reserveKey(req: Request, key: string, requestHash: string) {
-  const id = crypto.randomUUID();
-  const result = await prisma.idempotencyKey.createMany({
-    data: {
-      id,
-      userId: req.user!.userId,
-      key,
-      method: req.method,
-      path: req.originalUrl,
-      requestHash,
-      state: PROCESSING_STATE,
-      expiresAt: expiresAtFromNow(),
-    },
-    skipDuplicates: true,
-  });
+  const id = idempotencyId(req.user!.userId, key);
+  const reserved = await collectionRef(collectionNames.idempotencyKeys).firestore.runTransaction(
+    async (transaction) => {
+      const ref = docRef(collectionNames.idempotencyKeys, id);
+      const existing = await transaction.get(ref);
+      if (existing.exists) {
+        return false;
+      }
 
-  if (result.count === 1) {
+      const row: IdempotencyKey = {
+        id,
+        userId: req.user!.userId,
+        key,
+        method: req.method,
+        path: req.originalUrl,
+        requestHash,
+        responseBody: null,
+        statusCode: null,
+        state: PROCESSING_STATE,
+        createdAt: new Date(),
+        expiresAt: expiresAtFromNow(),
+      };
+      transaction.set(ref, cleanForFirestore(row));
+      return true;
+    },
+  );
+
+  if (reserved) {
     req.idempotencyRequestId = id;
   }
 
-  return result.count === 1;
+  return reserved;
 }
 
 export function requireIdempotency(options: IdempotencyOptions = {}) {
@@ -222,31 +239,25 @@ export function requireIdempotency(options: IdempotencyOptions = {}) {
       res.json = function idempotentJson(body: unknown) {
         const statusCode = res.statusCode;
         void (async () => {
-          await prisma.idempotencyKey.update({
-            where: {
-              userId_key: {
-                userId: req.user!.userId,
-                key: normalizedKey,
-              },
-            },
-            data: {
-              responseBody: toInputJson(body),
+          await docRef(
+            collectionNames.idempotencyKeys,
+            idempotencyId(req.user!.userId, normalizedKey),
+          ).set(
+            cleanForFirestore({
+              responseBody: body,
               statusCode,
               state: COMPLETED_STATE,
-            },
-          });
+            }),
+            { merge: true },
+          );
 
           originalJson(body);
         })().catch(async (err) => {
-          await prisma.idempotencyKey
-            .updateMany({
-              where: {
-                userId: req.user!.userId,
-                key: normalizedKey,
-                state: PROCESSING_STATE,
-              },
-              data: { state: FAILED_STATE },
-            })
+          await docRef(
+            collectionNames.idempotencyKeys,
+            idempotencyId(req.user!.userId, normalizedKey),
+          )
+            .set(cleanForFirestore({ state: FAILED_STATE }), { merge: true })
             .catch(() => undefined);
 
           next(err);

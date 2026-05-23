@@ -1,27 +1,40 @@
-import { prisma } from "../../lib/prisma";
 import { NotFoundError, ValidationError } from "../../lib/errors";
 import { config } from "../../config";
+import {
+  AppUser,
+  AuditLog,
+  cleanForFirestore,
+  collectionNames,
+  collectionRef,
+  docRef,
+  getDoc,
+  getQuery,
+  sortByDateDesc,
+  Subscription,
+  subscriptionId,
+} from "../../lib/firestore-db";
 
 interface UpdateProfileInput {
   displayName?: string;
   avatarUrl?: string | null;
 }
 
+function toMe(user: AppUser) {
+  return {
+    id: user.id,
+    displayName: user.displayName,
+    email: user.email,
+    avatarUrl: user.avatarUrl,
+    createdAt: user.createdAt,
+  };
+}
+
 export async function getMe(userId: string) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      displayName: true,
-      email: true,
-      avatarUrl: true,
-      createdAt: true,
-    },
-  });
+  const user = await getDoc<AppUser>(collectionNames.users, userId);
   if (!user) {
     throw new NotFoundError("User not found");
   }
-  return user;
+  return toMe(user);
 }
 
 export async function updateMe(userId: string, input: UpdateProfileInput) {
@@ -29,27 +42,26 @@ export async function updateMe(userId: string, input: UpdateProfileInput) {
     throw new ValidationError("Display name cannot be empty");
   }
 
-  const user = await prisma.user.update({
-    where: { id: userId },
-    data: {
-      ...(input.displayName !== undefined && { displayName: input.displayName }),
-      ...(input.avatarUrl !== undefined && { avatarUrl: input.avatarUrl }),
-    },
-    select: {
-      id: true,
-      displayName: true,
-      email: true,
-      avatarUrl: true,
-      createdAt: true,
-    },
-  });
-  return user;
+  const user = await getDoc<AppUser>(collectionNames.users, userId);
+  if (!user) {
+    throw new NotFoundError("User not found");
+  }
+
+  const updated: AppUser = {
+    ...user,
+    displayName: input.displayName ?? user.displayName,
+    avatarUrl: input.avatarUrl !== undefined ? input.avatarUrl : user.avatarUrl,
+  };
+
+  await docRef(collectionNames.users, userId).set(cleanForFirestore(updated));
+  return toMe(updated);
 }
 
 export async function getSubscription(userId: string) {
-  const subscription = await prisma.subscription.findUnique({
-    where: { userId },
-  });
+  const subscription = await getDoc<Subscription>(
+    collectionNames.subscriptions,
+    subscriptionId(userId),
+  );
   if (!subscription) {
     return {
       plan: "free",
@@ -67,25 +79,30 @@ export async function getSubscription(userId: string) {
 }
 
 export async function getUsage(userId: string) {
-  const groupCount = await prisma.group.count({
-    where: { ownerId: userId, status: "active" },
-  });
+  const groups = await getQuery<{ id: string }>(
+    collectionRef(collectionNames.groups)
+      .where("ownerId", "==", userId)
+      .where("status", "==", "active"),
+  );
 
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
 
-  const smartSettleCount = await prisma.auditLog.count({
-    where: {
-      actorUserId: userId,
-      action: "smart_settle",
-      createdAt: { gte: startOfMonth },
-    },
-  });
+  const smartSettleLogs = (
+    await getQuery<AuditLog>(
+      collectionRef(collectionNames.auditLogs)
+        .where("actorUserId", "==", userId)
+        .where("action", "==", "smart_settle"),
+    )
+  ).filter((log) => log.createdAt >= startOfMonth);
 
   return {
-    groupCount,
-    smartSettleUsedThisMonth: smartSettleCount,
+    groupCount: groups.length,
+    smartSettleUsedThisMonth: sortByDateDesc(
+      smartSettleLogs,
+      (log) => log.createdAt,
+    ).length,
     freeMaxGroups: config.freeTier.maxGroups,
     freeSmartSettlePerMonth: config.freeTier.smartSettlePerMonth,
   };

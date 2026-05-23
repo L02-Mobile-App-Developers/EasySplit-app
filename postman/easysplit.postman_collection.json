@@ -59,7 +59,7 @@
               { "key": "Authorization", "value": "Bearer {{firebaseIdToken}}" }
             ],
             "url": "{{baseUrl}}/auth/sync",
-            "description": "Verifies Firebase ID token and syncs/returns the PostgreSQL user."
+            "description": "Verifies Firebase ID token and syncs/returns the Firestore-backed user."
           }
         }
       ]

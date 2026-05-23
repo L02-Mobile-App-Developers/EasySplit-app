@@ -9,6 +9,8 @@ export function errorHandler(
   res: Response,
   _next: NextFunction,
 ): void {
+  void _next;
+
   if (err instanceof AppError) {
     logger.warn({ err }, "Application error");
     sendError(res, err.statusCode, err.code, err.message, err.details);

@@ -1,54 +1,40 @@
-import { prisma } from "../../lib/prisma";
 import { NotFoundError } from "../../lib/errors";
+import {
+  Balance,
+  balanceId,
+  collectionNames,
+  collectionRef,
+  getDoc,
+  getPublicUser,
+  getQuery,
+  groupMemberId,
+  GroupMember,
+} from "../../lib/firestore-db";
 
 export async function getBalances(groupId: string, userId: string) {
-  // Verify the requesting user is a group member
-  const membership = await prisma.groupMember.findUnique({
-    where: { groupId_userId: { groupId, userId } },
-  });
-  if (!membership || !membership.isActive) {
-    throw new NotFoundError("Group not found");
-  }
+  await assertActiveMember(groupId, userId);
 
-  const balances = await prisma.balance.findMany({
-    where: { groupId },
-    include: {
-      user: {
-        select: {
-          id: true,
-          displayName: true,
-          email: true,
-          avatarUrl: true,
-        },
-      },
-    },
-    orderBy: { balance: "desc" },
-  });
+  const balances = await getQuery<Balance>(
+    collectionRef(collectionNames.balances).where("groupId", "==", groupId),
+  );
 
-  return balances;
+  const enriched = await Promise.all(
+    balances.map(async (balance) => ({
+      ...balance,
+      user: await getPublicUser(balance.userId),
+    })),
+  );
+
+  return enriched.sort((a, b) => b.balance - a.balance);
 }
 
 export async function getMyBalance(groupId: string, userId: string) {
-  const membership = await prisma.groupMember.findUnique({
-    where: { groupId_userId: { groupId, userId } },
-  });
-  if (!membership || !membership.isActive) {
-    throw new NotFoundError("Group not found");
-  }
+  await assertActiveMember(groupId, userId);
 
-  const balance = await prisma.balance.findUnique({
-    where: { groupId_userId: { groupId, userId } },
-    include: {
-      user: {
-        select: {
-          id: true,
-          displayName: true,
-          email: true,
-          avatarUrl: true,
-        },
-      },
-    },
-  });
+  const balance = await getDoc<Balance>(
+    collectionNames.balances,
+    balanceId(groupId, userId),
+  );
 
   if (!balance) {
     return {
@@ -59,5 +45,18 @@ export async function getMyBalance(groupId: string, userId: string) {
     };
   }
 
-  return balance;
+  return {
+    ...balance,
+    user: await getPublicUser(userId),
+  };
+}
+
+async function assertActiveMember(groupId: string, userId: string) {
+  const membership = await getDoc<GroupMember>(
+    collectionNames.groupMembers,
+    groupMemberId(groupId, userId),
+  );
+  if (!membership || !membership.isActive) {
+    throw new NotFoundError("Group not found");
+  }
 }

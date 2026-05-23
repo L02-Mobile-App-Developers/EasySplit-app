@@ -1,19 +1,16 @@
-import { PrismaClient } from "@prisma/client";
 import { logger } from "../middleware/logger";
-
-export const prisma = new PrismaClient();
+import { checkFirestoreConnection } from "../lib/firebase-admin";
 
 export async function connectDatabase(): Promise<void> {
   try {
-    await prisma.$connect();
-    logger.info("Database connected successfully");
+    await checkFirestoreConnection();
+    logger.info("Firestore connected successfully");
   } catch (error) {
-    logger.error({ error }, "Failed to connect to database");
+    logger.error({ error }, "Failed to connect to Firestore");
     process.exit(1);
   }
 }
 
 export async function disconnectDatabase(): Promise<void> {
-  await prisma.$disconnect();
-  logger.info("Database disconnected");
+  logger.info("Firestore connection closed");
 }

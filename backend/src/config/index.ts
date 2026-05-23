@@ -14,10 +14,6 @@ export const config = {
   port: parseInt(process.env.PORT || "8080", 10),
   nodeEnv,
 
-  database: {
-    url: process.env.DATABASE_URL || "postgresql://easysplit:easysplit@localhost:5432/easysplit?schema=public",
-  },
-
   jwt: {
     secret: process.env.JWT_SECRET || "dev-secret-key-do-not-use-in-production",
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
@@ -48,6 +44,7 @@ export const config = {
     privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
     serviceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
     serviceAccountBase64: process.env.FIREBASE_SERVICE_ACCOUNT_BASE64,
+    firestoreDatabaseId: process.env.FIREBASE_FIRESTORE_DATABASE_ID,
   },
 } as const;
 

@@ -1,10 +1,24 @@
-import { prisma } from "../../lib/prisma";
 import {
   NotFoundError,
   ForbiddenError,
   ValidationError,
 } from "../../lib/errors";
 import { assertGroupMember, assertPremiumGroup } from "../../lib/entitlement";
+import {
+  Balance,
+  cleanForFirestore,
+  collectionNames,
+  collectionRef,
+  createId,
+  docRef,
+  getDoc,
+  getQuery,
+  GroupMember,
+  paginate,
+  publicUserMap,
+  Reminder,
+  sortByDateDesc,
+} from "../../lib/firestore-db";
 
 interface CreateReminderInput {
   targetUserIds: string[];
@@ -13,11 +27,6 @@ interface CreateReminderInput {
   scheduledAt?: string;
 }
 
-/**
- * POST /groups/:groupId/reminders
- * Create debt reminders for specified target users (Premium).
- * One reminder is created per target user.
- */
 export async function createReminder(
   groupId: string,
   userId: string,
@@ -32,53 +41,57 @@ export async function createReminder(
     throw new ValidationError("At least one targetUserId is required");
   }
 
-  // Validate that each target user is an active group member
-  const memberIds = new Set(
-    (
-      await prisma.groupMember.findMany({
-        where: { groupId, isActive: true },
-        select: { userId: true },
-      })
-    ).map((m: { userId: string }) => m.userId),
+  const activeMembers = await getQuery<GroupMember>(
+    collectionRef(collectionNames.groupMembers)
+      .where("groupId", "==", groupId)
+      .where("isActive", "==", true),
   );
+  const memberIds = new Set(activeMembers.map((member) => member.userId));
 
-  for (const tid of targetUserIds) {
-    if (!memberIds.has(tid)) {
-      throw new ValidationError(`User ${tid} is not an active group member`);
-    }
-  }
-
-  // Validate each target user has balance < 0 (is in debt)
-  const balances = await prisma.balance.findMany({
-    where: { groupId, userId: { in: targetUserIds } },
-  });
-  const balanceMap = new Map<string, number>(balances.map((b: { userId: string; balance: number }) => [b.userId, b.balance]));
-
-  for (const tid of targetUserIds) {
-    const bal = balanceMap.get(tid) ?? 0;
-    if (bal >= 0) {
+  for (const targetUserId of targetUserIds) {
+    if (!memberIds.has(targetUserId)) {
       throw new ValidationError(
-        `User ${tid} does not have a negative balance (current: ${bal}). Only users in debt can be reminded.`,
+        `User ${targetUserId} is not an active group member`,
       );
     }
   }
 
-  // Validate no duplicate reminder within 24h for same (target + group + message template)
+  const balances = await getQuery<Balance>(
+    collectionRef(collectionNames.balances).where("groupId", "==", groupId),
+  );
+  const balanceMap = new Map(
+    balances.map((balance) => [balance.userId, balance.balance]),
+  );
+
+  for (const targetUserId of targetUserIds) {
+    const balance = balanceMap.get(targetUserId) ?? 0;
+    if (balance >= 0) {
+      throw new ValidationError(
+        `User ${targetUserId} does not have a negative balance (current: ${balance}). Only users in debt can be reminded.`,
+      );
+    }
+  }
+
   const twentyFourHoursAgo = new Date();
   twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
 
-  const recentReminders = await prisma.reminder.findMany({
-    where: {
-      groupId,
-      targetUserId: { in: targetUserIds },
-      message: messageTemplate ?? undefined,
-      createdAt: { gte: twentyFourHoursAgo },
-    },
-    select: { targetUserId: true },
-  });
+  const recentReminders = (
+    await getQuery<Reminder>(
+      collectionRef(collectionNames.reminders).where("groupId", "==", groupId),
+    )
+  ).filter(
+    (reminder) =>
+      targetUserIds.includes(reminder.targetUserId) &&
+      reminder.createdAt >= twentyFourHoursAgo &&
+      (messageTemplate === undefined || reminder.message === messageTemplate),
+  );
 
-  const recentTargets = new Set(recentReminders.map((r: { targetUserId: string }) => r.targetUserId));
-  const duplicateTargets = targetUserIds.filter((tid) => recentTargets.has(tid));
+  const recentTargets = new Set(
+    recentReminders.map((reminder) => reminder.targetUserId),
+  );
+  const duplicateTargets = targetUserIds.filter((targetUserId) =>
+    recentTargets.has(targetUserId),
+  );
 
   if (duplicateTargets.length > 0) {
     throw new ValidationError(
@@ -86,39 +99,33 @@ export async function createReminder(
     );
   }
 
-  // Build the message
-  const defaultMessage = "Please settle your outstanding debt in the group.";
-  const message = messageTemplate || defaultMessage;
+  const message = messageTemplate || "Please settle your outstanding debt in the group.";
+  const now = new Date();
+  const reminders: Reminder[] = targetUserIds.map((targetUserId) => ({
+    id: createId(),
+    groupId,
+    targetUserId,
+    type: "debt_reminder",
+    status: "queued",
+    message,
+    channel,
+    scheduledAt: scheduledAt ? new Date(scheduledAt) : now,
+    createdBy: userId,
+    createdAt: now,
+  }));
 
-  // Create one reminder per target user
-  const reminders = await Promise.all(
-    targetUserIds.map((tid) =>
-      prisma.reminder.create({
-        data: {
-          groupId,
-          targetUserId: tid,
-          type: "debt_reminder",
-          status: "queued",
-          message,
-          channel,
-          scheduledAt: scheduledAt ? new Date(scheduledAt) : new Date(),
-          createdBy: userId,
-        },
-        include: {
-          targetUser: { select: { id: true, displayName: true, email: true } },
-          creator: { select: { id: true, displayName: true, email: true } },
-        },
-      }),
-    ),
-  );
+  const batch = collectionRef(collectionNames.reminders).firestore.batch();
+  for (const reminder of reminders) {
+    batch.set(
+      docRef(collectionNames.reminders, reminder.id),
+      cleanForFirestore(reminder),
+    );
+  }
+  await batch.commit();
 
-  return reminders;
+  return Promise.all(reminders.map(enrichReminder));
 }
 
-/**
- * GET /groups/:groupId/reminders
- * List reminders with pagination.
- */
 export async function getReminders(
   groupId: string,
   userId: string,
@@ -127,37 +134,20 @@ export async function getReminders(
 ) {
   await assertGroupMember(groupId, userId);
 
-  const skip = (page - 1) * limit;
-
-  const [items, total] = await Promise.all([
-    prisma.reminder.findMany({
-      where: { groupId },
-      skip,
-      take: limit,
-      include: {
-        targetUser: { select: { id: true, displayName: true, email: true } },
-        creator: { select: { id: true, displayName: true, email: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.reminder.count({ where: { groupId } }),
-  ]);
+  const reminders = sortByDateDesc(
+    await getQuery<Reminder>(
+      collectionRef(collectionNames.reminders).where("groupId", "==", groupId),
+    ),
+    (reminder) => reminder.createdAt,
+  );
+  const result = paginate(reminders, page, limit);
 
   return {
-    items,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
-    },
+    items: await Promise.all(result.items.map(enrichReminder)),
+    pagination: result.pagination,
   };
 }
 
-/**
- * POST /groups/:groupId/reminders/:reminderId/cancel
- * Cancel a reminder (only the creator can cancel).
- */
 export async function cancelReminder(
   groupId: string,
   reminderId: string,
@@ -165,11 +155,12 @@ export async function cancelReminder(
 ) {
   await assertGroupMember(groupId, userId);
 
-  const reminder = await prisma.reminder.findFirst({
-    where: { id: reminderId, groupId },
-  });
+  const reminder = await getDoc<Reminder>(
+    collectionNames.reminders,
+    reminderId,
+  );
 
-  if (!reminder) {
+  if (!reminder || reminder.groupId !== groupId) {
     throw new NotFoundError("Reminder not found");
   }
 
@@ -183,14 +174,24 @@ export async function cancelReminder(
     );
   }
 
-  const updated = await prisma.reminder.update({
-    where: { id: reminderId },
-    data: { status: "failed" },
-    include: {
-      targetUser: { select: { id: true, displayName: true, email: true } },
-      creator: { select: { id: true, displayName: true, email: true } },
-    },
-  });
+  const updated: Reminder = {
+    ...reminder,
+    status: "failed",
+  };
 
-  return updated;
+  await docRef(collectionNames.reminders, reminderId).set(
+    cleanForFirestore(updated),
+  );
+
+  return enrichReminder(updated);
+}
+
+async function enrichReminder(reminder: Reminder) {
+  const users = await publicUserMap([reminder.targetUserId, reminder.createdBy]);
+
+  return {
+    ...reminder,
+    targetUser: users.get(reminder.targetUserId) ?? null,
+    creator: users.get(reminder.createdBy) ?? null,
+  };
 }

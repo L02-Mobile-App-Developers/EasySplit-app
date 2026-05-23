@@ -1,10 +1,30 @@
-import { Prisma } from "@prisma/client";
-import { prisma } from "../../lib/prisma";
+import { Transaction } from "firebase-admin/firestore";
 import {
   ForbiddenError,
   NotFoundError,
   ValidationError,
 } from "../../lib/errors";
+import {
+  AuditLog,
+  Balance,
+  balanceId,
+  cleanForFirestore,
+  collectionNames,
+  collectionRef,
+  createId,
+  docRef,
+  Expense,
+  ExpenseParticipant,
+  getDoc,
+  getDocInTransaction,
+  getQuery,
+  getQueryInTransaction,
+  groupMemberId,
+  GroupMember,
+  paginate,
+  publicUserMap,
+  sortByDateDesc,
+} from "../../lib/firestore-db";
 
 interface ParticipantInput {
   userId: string;
@@ -29,10 +49,6 @@ interface UpdateExpenseInput {
   participants?: ParticipantInput[];
 }
 
-type ExpenseWithParticipants = Prisma.ExpenseGetPayload<{
-  include: { participants: true };
-}>;
-
 type ExpenseAuditSnapshot = {
   id: string;
   groupId: string;
@@ -48,9 +64,26 @@ type ExpenseAuditSnapshot = {
 };
 
 async function assertGroupMember(groupId: string, userId: string) {
-  const membership = await prisma.groupMember.findUnique({
-    where: { groupId_userId: { groupId, userId } },
-  });
+  const membership = await getDoc<GroupMember>(
+    collectionNames.groupMembers,
+    groupMemberId(groupId, userId),
+  );
+  if (!membership || !membership.isActive) {
+    throw new NotFoundError("Group not found");
+  }
+  return membership;
+}
+
+async function assertGroupMemberInTransaction(
+  transaction: Transaction,
+  groupId: string,
+  userId: string,
+) {
+  const membership = await getDocInTransaction<GroupMember>(
+    transaction,
+    collectionNames.groupMembers,
+    groupMemberId(groupId, userId),
+  );
   if (!membership || !membership.isActive) {
     throw new NotFoundError("Group not found");
   }
@@ -146,23 +179,14 @@ export function computeShares(
   return shares;
 }
 
-async function validateActiveGroupUsers(
-  tx: Prisma.TransactionClient,
-  groupId: string,
+function validateActiveGroupUsers(
+  activeMembers: GroupMember[],
   paidByUserId: string,
   participants: ParticipantInput[],
 ) {
   assertNoDuplicateParticipants(participants);
 
-  const memberIds = new Set(
-    (
-      await tx.groupMember.findMany({
-        where: { groupId, isActive: true },
-        select: { userId: true },
-      })
-    ).map((m) => m.userId),
-  );
-
+  const memberIds = new Set(activeMembers.map((member) => member.userId));
   const allUserIds = [paidByUserId, ...participants.map((p) => p.userId)];
   for (const uid of allUserIds) {
     if (!memberIds.has(uid)) {
@@ -171,7 +195,7 @@ async function validateActiveGroupUsers(
   }
 }
 
-function toAuditSnapshot(expense: ExpenseWithParticipants): ExpenseAuditSnapshot {
+function toAuditSnapshot(expense: Expense): ExpenseAuditSnapshot {
   return {
     id: expense.id,
     groupId: expense.groupId,
@@ -190,12 +214,8 @@ function toAuditSnapshot(expense: ExpenseWithParticipants): ExpenseAuditSnapshot
   };
 }
 
-function toInputJson(value: ExpenseAuditSnapshot): Prisma.InputJsonValue {
-  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
-}
-
-async function writeExpenseAudit(
-  tx: Prisma.TransactionClient,
+function writeExpenseAudit(
+  transaction: Transaction,
   actorUserId: string,
   action: string,
   groupId: string,
@@ -203,28 +223,31 @@ async function writeExpenseAudit(
   after: ExpenseAuditSnapshot | null,
   requestId?: string,
 ) {
-  await tx.auditLog.create({
-    data: {
-      actorUserId,
-      action,
-      entityType: "group",
-      entityId: groupId,
-      before: before ? toInputJson(before) : Prisma.JsonNull,
-      after: after ? toInputJson(after) : Prisma.JsonNull,
-      requestId: requestId ?? null,
-    },
-  });
+  const now = new Date();
+  const audit: AuditLog = {
+    id: requestId ?? createId(),
+    actorUserId,
+    action,
+    entityType: "group",
+    entityId: groupId,
+    before,
+    after,
+    requestId: requestId ?? null,
+    createdAt: now,
+  };
+  transaction.set(
+    docRef(collectionNames.auditLogs, audit.id),
+    cleanForFirestore(audit),
+  );
 }
 
-async function recalculateBalances(
-  tx: Prisma.TransactionClient,
+function recalculateBalances(
+  transaction: Transaction,
   groupId: string,
+  expenses: Expense[],
+  activeMembers: GroupMember[],
+  existingBalances: Balance[],
 ) {
-  const expenses = await tx.expense.findMany({
-    where: { groupId },
-    include: { participants: true },
-  });
-
   const netMap = new Map<string, number>();
 
   for (const expense of expenses) {
@@ -247,84 +270,86 @@ async function recalculateBalances(
     }
   }
 
-  const activeMembers = await tx.groupMember.findMany({
-    where: { groupId, isActive: true },
-    select: { userId: true },
-  });
+  const activeMemberIds = new Set(activeMembers.map((member) => member.userId));
 
   for (const member of activeMembers) {
-    await tx.balance.upsert({
-      where: { groupId_userId: { groupId, userId: member.userId } },
-      create: {
+    transaction.set(
+      docRef(collectionNames.balances, balanceId(groupId, member.userId)),
+      cleanForFirestore({
         groupId,
         userId: member.userId,
         balance: netMap.get(member.userId) ?? 0,
-      },
-      update: { balance: netMap.get(member.userId) ?? 0 },
-    });
+      }),
+    );
   }
 
-  await tx.balance.updateMany({
-    where: {
-      groupId,
-      userId: { notIn: activeMembers.map((member) => member.userId) },
-    },
-    data: { balance: 0 },
-  });
-}
-
-async function getExpenseWithParticipants(
-  tx: Prisma.TransactionClient,
-  groupId: string,
-  expenseId: string,
-) {
-  return tx.expense.findFirst({
-    where: { id: expenseId, groupId },
-    include: { participants: true },
-  });
-}
-
-async function getExpenseForResponse(expenseId: string) {
-  return prisma.expense.findUniqueOrThrow({
-    where: { id: expenseId },
-    include: {
-      participants: {
-        include: {
-          user: { select: { id: true, displayName: true, email: true } },
-        },
-      },
-      payer: { select: { id: true, displayName: true, email: true } },
-      creator: { select: { id: true, displayName: true, email: true } },
-    },
-  });
-}
-
-async function replaceParticipants(
-  tx: Prisma.TransactionClient,
-  expenseId: string,
-  participants: ParticipantInput[],
-) {
-  await tx.expenseParticipant.deleteMany({
-    where: { expenseId },
-  });
-
-  await tx.expenseParticipant.createMany({
-    data: participants.map((p) => ({
-      expenseId,
-      userId: p.userId,
-      value: p.value,
-    })),
-  });
+  for (const balance of existingBalances) {
+    if (!activeMemberIds.has(balance.userId)) {
+      transaction.set(
+        docRef(collectionNames.balances, balanceId(groupId, balance.userId)),
+        cleanForFirestore({ ...balance, balance: 0 }),
+      );
+    }
+  }
 }
 
 function sharesToParticipants(
   participants: ParticipantInput[],
   shares: Map<string, number>,
-): ParticipantInput[] {
+): ExpenseParticipant[] {
   return participants.map((participant) => ({
     userId: participant.userId,
     value: shares.get(participant.userId) ?? 0,
   }));
+}
+
+async function readGroupState(transaction: Transaction, groupId: string) {
+  const [activeMembers, expenses, balances] = await Promise.all([
+    getQueryInTransaction<GroupMember>(
+      transaction,
+      collectionRef(collectionNames.groupMembers)
+        .where("groupId", "==", groupId)
+        .where("isActive", "==", true),
+    ),
+    getQueryInTransaction<Expense>(
+      transaction,
+      collectionRef(collectionNames.expenses).where("groupId", "==", groupId),
+    ),
+    getQueryInTransaction<Balance>(
+      transaction,
+      collectionRef(collectionNames.balances).where("groupId", "==", groupId),
+    ),
+  ]);
+
+  return { activeMembers, expenses, balances };
+}
+
+async function getExpenseForResponse(expense: Expense | string) {
+  const expenseRecord =
+    typeof expense === "string"
+      ? await getDoc<Expense>(collectionNames.expenses, expense)
+      : expense;
+  if (!expenseRecord) {
+    throw new NotFoundError("Expense not found");
+  }
+
+  const users = await publicUserMap([
+    expenseRecord.paidByUserId,
+    expenseRecord.createdBy,
+    ...expenseRecord.participants.map((participant) => participant.userId),
+  ]);
+
+  return {
+    ...expenseRecord,
+    participants: expenseRecord.participants.map((participant) => ({
+      expenseId: expenseRecord.id,
+      userId: participant.userId,
+      value: participant.value,
+      user: users.get(participant.userId) ?? null,
+    })),
+    payer: users.get(expenseRecord.paidByUserId) ?? null,
+    creator: users.get(expenseRecord.createdBy) ?? null,
+  };
 }
 
 export async function createExpense(
@@ -333,53 +358,63 @@ export async function createExpense(
   input: CreateExpenseInput,
   requestId?: string,
 ) {
-  await assertGroupMember(groupId, userId);
+  assertNoDuplicateParticipants(input.participants);
   computeShares(input.amount, input.splitMode, input.participants);
 
-  const expenseId = await prisma.$transaction(
-    async (tx: Prisma.TransactionClient) => {
-      await validateActiveGroupUsers(
-        tx,
+  const created = await collectionRef(collectionNames.expenses).firestore.runTransaction(
+    async (transaction) => {
+      await assertGroupMemberInTransaction(transaction, groupId, userId);
+      const { activeMembers, expenses, balances } = await readGroupState(
+        transaction,
         groupId,
+      );
+      validateActiveGroupUsers(
+        activeMembers,
         input.paidByUserId,
         input.participants,
       );
 
-      const created = await tx.expense.create({
-        data: {
-          groupId,
-          description: input.description,
-          amount: input.amount,
-          currency: input.currency ?? "VND",
-          paidByUserId: input.paidByUserId,
-          splitMode: input.splitMode,
-          createdBy: userId,
-          participants: {
-            create: input.participants.map((p) => ({
-              userId: p.userId,
-              value: p.value,
-            })),
-          },
-        },
-        include: { participants: true },
-      });
+      const now = new Date();
+      const expense: Expense = {
+        id: createId(),
+        groupId,
+        description: input.description,
+        amount: input.amount,
+        currency: input.currency ?? "VND",
+        paidByUserId: input.paidByUserId,
+        splitMode: input.splitMode,
+        createdBy: userId,
+        createdAt: now,
+        updatedAt: now,
+        participants: input.participants,
+      };
 
-      await recalculateBalances(tx, groupId);
-      await writeExpenseAudit(
-        tx,
+      transaction.set(
+        docRef(collectionNames.expenses, expense.id),
+        cleanForFirestore(expense),
+      );
+      recalculateBalances(
+        transaction,
+        groupId,
+        [...expenses, expense],
+        activeMembers,
+        balances,
+      );
+      writeExpenseAudit(
+        transaction,
         userId,
         "expense_created",
         groupId,
         null,
-        toAuditSnapshot(created),
+        toAuditSnapshot(expense),
         requestId,
       );
 
-      return created.id;
+      return expense;
     },
   );
 
-  return getExpenseForResponse(expenseId);
+  return getExpenseForResponse(created);
 }
 
 export async function getExpenses(
@@ -390,35 +425,17 @@ export async function getExpenses(
 ) {
   await assertGroupMember(groupId, userId);
 
-  const skip = (page - 1) * limit;
-
-  const [items, total] = await Promise.all([
-    prisma.expense.findMany({
-      where: { groupId },
-      skip,
-      take: limit,
-      include: {
-        participants: {
-          include: {
-            user: { select: { id: true, displayName: true, email: true } },
-          },
-        },
-        payer: { select: { id: true, displayName: true, email: true } },
-        creator: { select: { id: true, displayName: true, email: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.expense.count({ where: { groupId } }),
-  ]);
+  const expenses = sortByDateDesc(
+    await getQuery<Expense>(
+      collectionRef(collectionNames.expenses).where("groupId", "==", groupId),
+    ),
+    (expense) => expense.createdAt,
+  );
+  const result = paginate(expenses, page, limit);
 
   return {
-    items,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
-    },
+    items: await Promise.all(result.items.map(getExpenseForResponse)),
+    pagination: result.pagination,
   };
 }
 
@@ -429,24 +446,12 @@ export async function getExpense(
 ) {
   await assertGroupMember(groupId, userId);
 
-  const expense = await prisma.expense.findFirst({
-    where: { id: expenseId, groupId },
-    include: {
-      participants: {
-        include: {
-          user: { select: { id: true, displayName: true, email: true } },
-        },
-      },
-      payer: { select: { id: true, displayName: true, email: true } },
-      creator: { select: { id: true, displayName: true, email: true } },
-    },
-  });
-
-  if (!expense) {
+  const expense = await getDoc<Expense>(collectionNames.expenses, expenseId);
+  if (!expense || expense.groupId !== groupId) {
     throw new NotFoundError("Expense not found");
   }
 
-  return expense;
+  return getExpenseForResponse(expense);
 }
 
 export async function updateExpense(
@@ -456,14 +461,26 @@ export async function updateExpense(
   input: UpdateExpenseInput,
   requestId?: string,
 ) {
-  const membership = await assertGroupMember(groupId, userId);
-
-  const updatedExpenseId = await prisma.$transaction(
-    async (tx: Prisma.TransactionClient) => {
-      const existing = await getExpenseWithParticipants(tx, groupId, expenseId);
-      if (!existing) {
+  const updated = await collectionRef(collectionNames.expenses).firestore.runTransaction(
+    async (transaction) => {
+      const membership = await assertGroupMemberInTransaction(
+        transaction,
+        groupId,
+        userId,
+      );
+      const existing = await getDocInTransaction<Expense>(
+        transaction,
+        collectionNames.expenses,
+        expenseId,
+      );
+      if (!existing || existing.groupId !== groupId) {
         throw new NotFoundError("Expense not found");
       }
+
+      const { activeMembers, expenses, balances } = await readGroupState(
+        transaction,
+        groupId,
+      );
 
       const canUpdate =
         existing.createdBy === userId ||
@@ -482,65 +499,62 @@ export async function updateExpense(
         userId: p.userId,
         value: p.value,
       }));
-      const participants =
-        input.participants ?? existingParticipants;
+      const participants = input.participants ?? existingParticipants;
       const amountChanged =
         input.amount !== undefined && input.amount !== existing.amount;
       const splitModeChanged =
         input.splitMode !== undefined && input.splitMode !== existing.splitMode;
 
-      await validateActiveGroupUsers(tx, groupId, paidByUserId, participants);
+      validateActiveGroupUsers(activeMembers, paidByUserId, participants);
       const shares = computeShares(amount, splitMode, participants);
 
-      // Participant rows are stable for metadata-only updates. If the caller
-      // changes an equal split without sending participants, persist the
-      // recalculated shares so stored participant values match the new amount.
       const participantsToPersist =
         input.participants !== undefined
           ? participants
           : (amountChanged || splitModeChanged) && splitMode === "equal"
             ? sharesToParticipants(participants, shares)
-            : null;
+            : participants;
 
-      const before = toAuditSnapshot(existing);
+      const updatedExpense: Expense = {
+        ...existing,
+        description,
+        amount,
+        currency,
+        paidByUserId,
+        splitMode,
+        participants: participantsToPersist,
+        updatedAt: new Date(),
+      };
 
-      await tx.expense.update({
-        where: { id: expenseId },
-        data: {
-          description,
-          amount,
-          currency,
-          paidByUserId,
-          splitMode,
-        },
-      });
+      transaction.set(
+        docRef(collectionNames.expenses, expenseId),
+        cleanForFirestore(updatedExpense),
+      );
+      recalculateBalances(
+        transaction,
+        groupId,
+        expenses.map((expense) =>
+          expense.id === expenseId ? updatedExpense : expense,
+        ),
+        activeMembers,
+        balances,
+      );
 
-      if (participantsToPersist) {
-        await replaceParticipants(tx, expenseId, participantsToPersist);
-      }
-
-      await recalculateBalances(tx, groupId);
-
-      const updated = await getExpenseWithParticipants(tx, groupId, expenseId);
-      if (!updated) {
-        throw new NotFoundError("Expense not found");
-      }
-
-      await writeExpenseAudit(
-        tx,
+      writeExpenseAudit(
+        transaction,
         userId,
         "expense_updated",
         groupId,
-        before,
-        toAuditSnapshot(updated),
+        toAuditSnapshot(existing),
+        toAuditSnapshot(updatedExpense),
         requestId,
       );
 
-      return updated.id;
+      return updatedExpense;
     },
   );
 
-  return getExpenseForResponse(updatedExpenseId);
+  return getExpenseForResponse(updated);
 }
 
 export async function deleteExpense(
@@ -549,36 +563,54 @@ export async function deleteExpense(
   userId: string,
   requestId?: string,
 ) {
-  const membership = await assertGroupMember(groupId, userId);
+  await collectionRef(collectionNames.expenses).firestore.runTransaction(
+    async (transaction) => {
+      const membership = await assertGroupMemberInTransaction(
+        transaction,
+        groupId,
+        userId,
+      );
+      const existing = await getDocInTransaction<Expense>(
+        transaction,
+        collectionNames.expenses,
+        expenseId,
+      );
+      if (!existing || existing.groupId !== groupId) {
+        throw new NotFoundError("Expense not found");
+      }
 
-  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    const existing = await getExpenseWithParticipants(tx, groupId, expenseId);
-    if (!existing) {
-      throw new NotFoundError("Expense not found");
-    }
+      const { activeMembers, expenses, balances } = await readGroupState(
+        transaction,
+        groupId,
+      );
 
-    const canDelete =
-      existing.createdBy === userId ||
-      membership.role === "owner" ||
-      membership.role === "admin";
-    if (!canDelete) {
-      throw new ForbiddenError("Only the expense creator or group admin can delete this expense");
-    }
+      const canDelete =
+        existing.createdBy === userId ||
+        membership.role === "owner" ||
+        membership.role === "admin";
+      if (!canDelete) {
+        throw new ForbiddenError("Only the expense creator or group admin can delete this expense");
+      }
 
-    const before = toAuditSnapshot(existing);
-
-    await tx.expense.delete({ where: { id: expenseId } });
-    await recalculateBalances(tx, groupId);
-    await writeExpenseAudit(
-      tx,
-      userId,
-      "expense_deleted",
-      groupId,
-      before,
-      null,
-      requestId,
-    );
-  });
+      transaction.delete(docRef(collectionNames.expenses, expenseId));
+      recalculateBalances(
+        transaction,
+        groupId,
+        expenses.filter((expense) => expense.id !== expenseId),
+        activeMembers,
+        balances,
+      );
+      writeExpenseAudit(
+        transaction,
+        userId,
+        "expense_deleted",
+        groupId,
+        toAuditSnapshot(existing),
+        null,
+        requestId,
+      );
+    },
+  );
 
   return { id: expenseId };
 }

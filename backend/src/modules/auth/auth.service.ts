@@ -1,9 +1,19 @@
-import { prisma } from "../../lib/prisma";
 import { hashPassword, verifyPassword } from "../../lib/password";
 import { signAccessToken, signRefreshToken, verifyToken } from "../../lib/jwt";
 import { ConflictError, NotFoundError, UnauthorizedError } from "../../lib/errors";
 import { config } from "../../config";
 import type { AuthPayload } from "../../middleware/auth";
+import {
+  AppUser,
+  cleanForFirestore,
+  collectionNames,
+  collectionRef,
+  createId,
+  docRef,
+  getDoc,
+  getFirstByField,
+  subscriptionId,
+} from "../../lib/firestore-db";
 
 interface RegisterInput {
   email: string;
@@ -57,66 +67,103 @@ function toPublicUser(user: {
   };
 }
 
+async function createUserWithFreeSubscription(user: AppUser) {
+  const now = new Date();
+  const batch = collectionRef(collectionNames.users).firestore.batch();
+
+  batch.set(docRef(collectionNames.users, user.id), cleanForFirestore(user));
+  batch.set(
+    docRef(collectionNames.subscriptions, subscriptionId(user.id)),
+    cleanForFirestore({
+      id: createId(),
+      userId: user.id,
+      plan: "free",
+      status: "active",
+      currentPeriodStart: null,
+      currentPeriodEnd: null,
+      createdAt: now,
+      updatedAt: now,
+    }),
+  );
+
+  await batch.commit();
+}
+
+async function assertEmailAvailable(email: string, userId?: string) {
+  const emailOwner = await getFirstByField<AppUser>(
+    collectionNames.users,
+    "email",
+    email,
+  );
+  if (emailOwner && emailOwner.id !== userId) {
+    throw new ConflictError("Email already registered");
+  }
+}
+
 export async function syncFirebaseUser(input: FirebaseUserInput) {
   const displayName =
     input.displayName?.trim() ||
     input.email?.split("@")[0] ||
     "Firebase User";
 
-  const existingByFirebaseUid = await prisma.user.findUnique({
-    where: { firebaseUid: input.firebaseUid },
-  });
+  const existingByFirebaseUid = await getFirstByField<AppUser>(
+    collectionNames.users,
+    "firebaseUid",
+    input.firebaseUid,
+  );
 
   if (existingByFirebaseUid) {
-    const user = await prisma.user.update({
-      where: { id: existingByFirebaseUid.id },
-      data: {
-        email: input.email ?? existingByFirebaseUid.email,
-        displayName,
-        avatarUrl: input.avatarUrl ?? existingByFirebaseUid.avatarUrl,
-      },
-    });
+    if (input.email) {
+      await assertEmailAvailable(input.email, existingByFirebaseUid.id);
+    }
+
+    const user: AppUser = {
+      ...existingByFirebaseUid,
+      email: input.email ?? existingByFirebaseUid.email,
+      displayName,
+      avatarUrl: input.avatarUrl ?? existingByFirebaseUid.avatarUrl,
+    };
+    await docRef(collectionNames.users, user.id).set(cleanForFirestore(user));
     return toPublicUser(user);
   }
 
   const existingByEmail = input.email
-    ? await prisma.user.findUnique({ where: { email: input.email } })
+    ? await getFirstByField<AppUser>(
+        collectionNames.users,
+        "email",
+        input.email,
+      )
     : null;
 
   if (existingByEmail) {
-    const user = await prisma.user.update({
-      where: { id: existingByEmail.id },
-      data: {
-        firebaseUid: input.firebaseUid,
-        displayName,
-        avatarUrl: input.avatarUrl ?? existingByEmail.avatarUrl,
-      },
-    });
+    const user: AppUser = {
+      ...existingByEmail,
+      firebaseUid: input.firebaseUid,
+      displayName,
+      avatarUrl: input.avatarUrl ?? existingByEmail.avatarUrl,
+    };
+    await docRef(collectionNames.users, user.id).set(cleanForFirestore(user));
     return toPublicUser(user);
   }
 
-  const user = await prisma.user.create({
-    data: {
-      firebaseUid: input.firebaseUid,
-      email: input.email ?? null,
-      displayName,
-      avatarUrl: input.avatarUrl ?? null,
-      subscription: {
-        create: {
-          plan: "free",
-          status: "active",
-        },
-      },
-    },
-  });
+  const now = new Date();
+  const user: AppUser = {
+    id: createId(),
+    firebaseUid: input.firebaseUid,
+    email: input.email ?? null,
+    displayName,
+    passwordHash: null,
+    avatarUrl: input.avatarUrl ?? null,
+    createdAt: now,
+  };
+
+  await createUserWithFreeSubscription(user);
 
   return toPublicUser(user);
 }
 
 export async function getCurrentUser(userId: string) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-  });
+  const user = await getDoc<AppUser>(collectionNames.users, userId);
   if (!user) {
     throw new NotFoundError("User not found");
   }
@@ -125,29 +172,20 @@ export async function getCurrentUser(userId: string) {
 
 export async function register(input: RegisterInput): Promise<AuthResult> {
   assertLocalJwtAuthAllowed();
+  await assertEmailAvailable(input.email);
 
-  const existing = await prisma.user.findUnique({
-    where: { email: input.email },
-  });
-  if (existing) {
-    throw new ConflictError("Email already registered");
-  }
+  const now = new Date();
+  const user: AppUser = {
+    id: createId(),
+    firebaseUid: null,
+    email: input.email,
+    displayName: input.displayName,
+    passwordHash: hashPassword(input.password),
+    avatarUrl: null,
+    createdAt: now,
+  };
 
-  const passwordHash = hashPassword(input.password);
-
-  const user = await prisma.user.create({
-    data: {
-      email: input.email,
-      displayName: input.displayName,
-      passwordHash,
-      subscription: {
-        create: {
-          plan: "free",
-          status: "active",
-        },
-      },
-    },
-  });
+  await createUserWithFreeSubscription(user);
 
   const payload: AuthPayload = { userId: user.id, email: user.email };
   const accessToken = signAccessToken(payload);
@@ -163,14 +201,12 @@ export async function register(input: RegisterInput): Promise<AuthResult> {
 export async function login(input: LoginInput): Promise<AuthResult> {
   assertLocalJwtAuthAllowed();
 
-  const user = await prisma.user.findUnique({
-    where: { email: input.email },
-  });
-  if (!user) {
-    throw new UnauthorizedError("Invalid email or password");
-  }
-
-  if (!user.passwordHash) {
+  const user = await getFirstByField<AppUser>(
+    collectionNames.users,
+    "email",
+    input.email,
+  );
+  if (!user || !user.passwordHash) {
     throw new UnauthorizedError("Invalid email or password");
   }
 
@@ -200,9 +236,7 @@ export async function refreshToken(token: string): Promise<AuthResult> {
     throw new UnauthorizedError("Invalid or expired refresh token");
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: payload.userId },
-  });
+  const user = await getDoc<AppUser>(collectionNames.users, payload.userId);
   if (!user) {
     throw new UnauthorizedError("User not found");
   }
@@ -217,6 +251,3 @@ export async function refreshToken(token: string): Promise<AuthResult> {
     refreshToken,
   };
 }
-
-
-

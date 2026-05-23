@@ -6,8 +6,8 @@ info:
     EasySplit backend API for groups, expenses, balances, settlements, reminders, and activity history.
 
     Production/staging authentication uses Firebase Authentication. Send `Authorization: Bearer <firebase_id_token>`
-    on protected endpoints. PostgreSQL is the source of truth for financial data; Firebase is not used as the
-    financial database.
+    on protected endpoints. Cloud Firestore is the source of truth for users, groups, expenses, balances,
+    settlements, entitlements, idempotency keys, reminders, and audit logs.
 servers:
   - url: http://localhost:8080/api/v1
     description: Local development
@@ -58,8 +58,8 @@ paths:
   /auth/sync:
     post:
       tags: [Auth]
-      summary: Sync Firebase user into PostgreSQL
-      description: Verifies the Firebase ID token and returns the internal PostgreSQL user.
+      summary: Sync Firebase user into Firestore
+      description: Verifies the Firebase ID token and returns the internal Firestore-backed user.
       responses:
         "200":
           description: User synced.

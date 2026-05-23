@@ -1,10 +1,18 @@
-import { prisma } from "../../lib/prisma";
 import {
   assertGroupMember,
   getGroupOwnerSubscription,
   isPremiumSubscriptionActive,
 } from "../../lib/entitlement";
 import { config } from "../../config";
+import {
+  AuditLog,
+  collectionNames,
+  collectionRef,
+  getQuery,
+  paginate,
+  publicUserMap,
+  sortByDateDesc,
+} from "../../lib/firestore-db";
 
 interface HistoryFilters {
   page?: number;
@@ -15,11 +23,6 @@ interface HistoryFilters {
   type?: string;
 }
 
-/**
- * GET /groups/:groupId/activities
- * Return recent activity feed (AuditLog entries for the group).
- * Free tier: limited to the last 90 days.
- */
 export async function getActivities(
   groupId: string,
   userId: string,
@@ -28,48 +31,27 @@ export async function getActivities(
 ) {
   await assertGroupMember(groupId, userId);
 
-  const skip = (page - 1) * limit;
-
-  // Free tier: cap the earliest date to historyDays ago
   const historyCutoff = new Date();
   historyCutoff.setDate(historyCutoff.getDate() - config.freeTier.historyDays);
 
-  const where: Record<string, unknown> = {
-    entityType: "group",
-    entityId: groupId,
-    createdAt: { gte: historyCutoff },
-  };
-
-  const [items, total] = await Promise.all([
-    prisma.auditLog.findMany({
-      where,
-      skip,
-      take: limit,
-      include: {
-        actor: { select: { id: true, displayName: true, email: true, avatarUrl: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.auditLog.count({ where }),
-  ]);
+  const logs = sortByDateDesc(
+    (
+      await getQuery<AuditLog>(
+        collectionRef(collectionNames.auditLogs)
+          .where("entityType", "==", "group")
+          .where("entityId", "==", groupId),
+      )
+    ).filter((log) => log.createdAt >= historyCutoff),
+    (log) => log.createdAt,
+  );
+  const result = paginate(logs, page, limit);
 
   return {
-    items,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
-    },
+    items: await enrichAuditLogs(result.items),
+    pagination: result.pagination,
   };
 }
 
-/**
- * GET /groups/:groupId/history
- * Return comprehensive history with advanced filtering.
- * Free tier: `from` is capped to 90 days.
- * Premium: full access to all filters and time range.
- */
 export async function getHistory(
   groupId: string,
   userId: string,
@@ -79,24 +61,14 @@ export async function getHistory(
 
   const page = filters.page ?? 1;
   const limit = filters.limit ?? 20;
-  const skip = (page - 1) * limit;
 
   const { subscription } = await getGroupOwnerSubscription(groupId);
   const plan = subscription?.plan ?? "free";
-  const status = subscription?.status ?? "active";
   const isPremium = isPremiumSubscriptionActive(subscription);
 
-  // Build filters
-  const where: Record<string, unknown> = {
-    entityType: "group",
-    entityId: groupId,
-  };
-
-  // Time range filter
   const fromDate = filters.from ? new Date(filters.from) : null;
   const toDate = filters.to ? new Date(filters.to) : null;
 
-  // Free tier: cap `from` to historyDays
   const historyCutoff = new Date();
   historyCutoff.setDate(historyCutoff.getDate() - config.freeTier.historyDays);
 
@@ -109,50 +81,52 @@ export async function getHistory(
     effectiveFrom = fromDate ?? historyCutoff;
   }
 
-  const createdAtFilter: Record<string, Date> = {};
-  createdAtFilter.gte = effectiveFrom;
-  if (toDate) {
-    createdAtFilter.lte = toDate;
-  }
-  where.createdAt = createdAtFilter;
-
-  // Actor filter
-  if (filters.actorId) {
-    where.actorUserId = filters.actorId;
-  }
-
-  // Type filter - maps to action prefix matching
-  if (filters.type) {
-    const validTypes = ["expense", "settlement", "reminder", "member", "group"];
-    if (validTypes.includes(filters.type)) {
-      where.action = { startsWith: filters.type };
-    }
-  }
-
-  const [items, total] = await Promise.all([
-    prisma.auditLog.findMany({
-      where,
-      skip,
-      take: limit,
-      include: {
-        actor: { select: { id: true, displayName: true, email: true, avatarUrl: true } },
-      },
-      orderBy: { createdAt: "desc" },
+  const validTypes = ["expense", "settlement", "reminder", "member", "group"];
+  const logs = sortByDateDesc(
+    (
+      await getQuery<AuditLog>(
+        collectionRef(collectionNames.auditLogs)
+          .where("entityType", "==", "group")
+          .where("entityId", "==", groupId),
+      )
+    ).filter((log) => {
+      if (log.createdAt < effectiveFrom) {
+        return false;
+      }
+      if (toDate && log.createdAt > toDate) {
+        return false;
+      }
+      if (filters.actorId && log.actorUserId !== filters.actorId) {
+        return false;
+      }
+      if (
+        filters.type &&
+        validTypes.includes(filters.type) &&
+        !log.action.startsWith(filters.type)
+      ) {
+        return false;
+      }
+      return true;
     }),
-    prisma.auditLog.count({ where }),
-  ]);
+    (log) => log.createdAt,
+  );
+  const result = paginate(logs, page, limit);
 
   return {
-    items,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
-    },
+    items: await enrichAuditLogs(result.items),
+    pagination: result.pagination,
     meta: {
       plan,
       historyDays: isPremium ? null : config.freeTier.historyDays,
     },
   };
+}
+
+async function enrichAuditLogs(logs: AuditLog[]) {
+  const users = await publicUserMap(logs.map((log) => log.actorUserId));
+
+  return logs.map((log) => ({
+    ...log,
+    actor: users.get(log.actorUserId) ?? null,
+  }));
 }

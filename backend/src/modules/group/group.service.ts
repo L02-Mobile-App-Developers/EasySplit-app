@@ -1,4 +1,3 @@
-import { prisma } from "../../lib/prisma";
 import {
   NotFoundError,
   ForbiddenError,
@@ -7,6 +6,21 @@ import {
 } from "../../lib/errors";
 import { config } from "../../config";
 import { isUserPremium } from "../../lib/entitlement";
+import {
+  AppUser,
+  Balance,
+  cleanForFirestore,
+  collectionNames,
+  collectionRef,
+  createId,
+  docRef,
+  getDoc,
+  getQuery,
+  groupMemberId,
+  Group,
+  GroupMember,
+  balanceId,
+} from "../../lib/firestore-db";
 
 interface CreateGroupInput {
   name: string;
@@ -20,87 +34,97 @@ interface UpdateGroupInput {
 
 export async function createGroup(userId: string, input: CreateGroupInput) {
   if (!(await isUserPremium(userId))) {
-    const activeGroupCount = await prisma.group.count({
-      where: { ownerId: userId, status: "active" },
-    });
-    if (activeGroupCount >= config.freeTier.maxGroups) {
+    const activeGroups = await getQuery<Group>(
+      collectionRef(collectionNames.groups)
+        .where("ownerId", "==", userId)
+        .where("status", "==", "active"),
+    );
+    if (activeGroups.length >= config.freeTier.maxGroups) {
       throw new FreeQuotaExceededError(
         `Free tier limit of ${config.freeTier.maxGroups} groups reached`,
       );
     }
   }
 
-  const group = await prisma.group.create({
-    data: {
-      name: input.name,
-      category: input.category,
-      ownerId: userId,
-      members: {
-        create: {
-          userId,
-          role: "owner",
-        },
-      },
-    },
-  });
-
-  return {
-    id: group.id,
-    name: group.name,
-    category: group.category,
-    ownerId: group.ownerId,
-    status: group.status,
-    createdAt: group.createdAt,
-    updatedAt: group.updatedAt,
+  const now = new Date();
+  const group: Group = {
+    id: createId(),
+    name: input.name,
+    category: input.category,
+    ownerId: userId,
+    status: "active",
+    createdAt: now,
+    updatedAt: now,
   };
+  const membership: GroupMember = {
+    groupId: group.id,
+    userId,
+    role: "owner",
+    joinedAt: now,
+    isActive: true,
+  };
+  const balance: Balance = {
+    groupId: group.id,
+    userId,
+    balance: 0,
+  };
+
+  const batch = collectionRef(collectionNames.groups).firestore.batch();
+  batch.set(docRef(collectionNames.groups, group.id), cleanForFirestore(group));
+  batch.set(
+    docRef(collectionNames.groupMembers, groupMemberId(group.id, userId)),
+    cleanForFirestore(membership),
+  );
+  batch.set(
+    docRef(collectionNames.balances, balanceId(group.id, userId)),
+    cleanForFirestore(balance),
+  );
+  await batch.commit();
+
+  return group;
 }
 
 export async function getGroups(userId: string) {
-  const memberships = await prisma.groupMember.findMany({
-    where: { userId, isActive: true },
-    include: {
-      group: {
-        select: {
-          id: true,
-          name: true,
-          category: true,
-          ownerId: true,
-          status: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      },
-    },
-    orderBy: { group: { updatedAt: "desc" } },
-  });
+  const memberships = await getQuery<GroupMember>(
+    collectionRef(collectionNames.groupMembers)
+      .where("userId", "==", userId)
+      .where("isActive", "==", true),
+  );
 
-  return memberships.map((m) => ({
-    ...m.group,
-    role: m.role,
-  }));
+  const groups = await Promise.all(
+    memberships.map(async (membership) => {
+      const group = await getDoc<Group>(collectionNames.groups, membership.groupId);
+      return group
+        ? {
+            ...group,
+            role: membership.role,
+          }
+        : null;
+    }),
+  );
+
+  return groups
+    .filter((group): group is Group & { role: string } => group !== null)
+    .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 }
 
 export async function getGroup(groupId: string, userId: string) {
-  const membership = await prisma.groupMember.findUnique({
-    where: { groupId_userId: { groupId, userId } },
-  });
+  const membership = await getMembership(groupId, userId);
   if (!membership || !membership.isActive) {
     throw new NotFoundError("Group not found");
   }
 
-  const group = await prisma.group.findUnique({
-    where: { id: groupId },
-  });
+  const group = await getDoc<Group>(collectionNames.groups, groupId);
   if (!group) {
     throw new NotFoundError("Group not found");
   }
 
+  const activeMembers = await getActiveMembers(groupId);
+
   return {
     ...group,
     role: membership.role,
-    memberCount: await prisma.groupMember.count({
-      where: { groupId, isActive: true },
-    }),
+    memberCount: activeMembers.length,
   };
 }
 
@@ -111,60 +135,65 @@ export async function updateGroup(
 ) {
   await assertOwnerOrAdmin(groupId, userId);
 
-  const group = await prisma.group.update({
-    where: { id: groupId },
-    data: {
-      ...(input.name !== undefined && { name: input.name }),
-      ...(input.category !== undefined && { category: input.category }),
-    },
-  });
+  const group = await getDoc<Group>(collectionNames.groups, groupId);
+  if (!group) {
+    throw new NotFoundError("Group not found");
+  }
 
-  return group;
+  const updated: Group = {
+    ...group,
+    ...(input.name !== undefined && { name: input.name }),
+    ...(input.category !== undefined && { category: input.category }),
+    updatedAt: new Date(),
+  };
+
+  await docRef(collectionNames.groups, groupId).set(cleanForFirestore(updated));
+  return updated;
 }
 
 export async function closeGroup(groupId: string, userId: string) {
   await assertOwnerOrAdmin(groupId, userId);
 
-  const group = await prisma.group.update({
-    where: { id: groupId },
-    data: { status: "closed" },
-  });
+  const group = await getDoc<Group>(collectionNames.groups, groupId);
+  if (!group) {
+    throw new NotFoundError("Group not found");
+  }
 
-  return group;
+  const updated: Group = {
+    ...group,
+    status: "closed",
+    updatedAt: new Date(),
+  };
+
+  await docRef(collectionNames.groups, groupId).set(cleanForFirestore(updated));
+  return updated;
 }
 
 export async function getMembers(groupId: string, userId: string) {
-  // Verify request user is a member
-  const membership = await prisma.groupMember.findUnique({
-    where: { groupId_userId: { groupId, userId } },
-  });
+  const membership = await getMembership(groupId, userId);
   if (!membership || !membership.isActive) {
     throw new NotFoundError("Group not found");
   }
 
-  const members = await prisma.groupMember.findMany({
-    where: { groupId, isActive: true },
-    include: {
-      user: {
-        select: {
-          id: true,
-          displayName: true,
-          email: true,
-          avatarUrl: true,
-        },
-      },
-    },
-    orderBy: { joinedAt: "asc" },
-  });
+  const members = await getActiveMembers(groupId);
+  const users = await Promise.all(
+    members.map(async (member) => ({
+      member,
+      user: await getDoc<AppUser>(collectionNames.users, member.userId),
+    })),
+  );
 
-  return members.map((m) => ({
-    userId: m.userId,
-    displayName: m.user.displayName,
-    email: m.user.email,
-    avatarUrl: m.user.avatarUrl,
-    role: m.role,
-    joinedAt: m.joinedAt,
-  }));
+  return users
+    .filter((entry) => entry.user !== null)
+    .sort((a, b) => a.member.joinedAt.getTime() - b.member.joinedAt.getTime())
+    .map(({ member, user }) => ({
+      userId: member.userId,
+      displayName: user!.displayName,
+      email: user!.email,
+      avatarUrl: user!.avatarUrl,
+      role: member.role,
+      joinedAt: member.joinedAt,
+    }));
 }
 
 export async function addMember(
@@ -175,34 +204,50 @@ export async function addMember(
 ) {
   await assertOwnerOrAdmin(groupId, userId);
 
-  const targetUser = await prisma.user.findUnique({
-    where: { id: targetUserId },
-  });
+  const targetUser = await getDoc<AppUser>(collectionNames.users, targetUserId);
   if (!targetUser) {
     throw new NotFoundError("User not found");
   }
 
-  const existing = await prisma.groupMember.findUnique({
-    where: { groupId_userId: { groupId, userId: targetUserId } },
-  });
+  const existing = await getMembership(groupId, targetUserId);
   if (existing) {
     if (existing.isActive) {
       throw new ConflictError("User is already a member of this group");
     }
-    await prisma.groupMember.update({
-      where: { groupId_userId: { groupId, userId: targetUserId } },
-      data: { isActive: true, role },
-    });
-    return { userId: targetUserId, role, joinedAt: new Date() };
+
+    const updated: GroupMember = {
+      ...existing,
+      isActive: true,
+      role,
+      joinedAt: new Date(),
+    };
+    await docRef(
+      collectionNames.groupMembers,
+      groupMemberId(groupId, targetUserId),
+    ).set(cleanForFirestore(updated));
+    await ensureBalance(groupId, targetUserId);
+    return { userId: targetUserId, role, joinedAt: updated.joinedAt };
   }
 
-  const member = await prisma.groupMember.create({
-    data: {
-      groupId,
-      userId: targetUserId,
-      role,
-    },
-  });
+  const member: GroupMember = {
+    groupId,
+    userId: targetUserId,
+    role,
+    joinedAt: new Date(),
+    isActive: true,
+  };
+
+  const batch = collectionRef(collectionNames.groupMembers).firestore.batch();
+  batch.set(
+    docRef(collectionNames.groupMembers, groupMemberId(groupId, targetUserId)),
+    cleanForFirestore(member),
+  );
+  batch.set(
+    docRef(collectionNames.balances, balanceId(groupId, targetUserId)),
+    cleanForFirestore({ groupId, userId: targetUserId, balance: 0 }),
+    { merge: true },
+  );
+  await batch.commit();
 
   return {
     userId: member.userId,
@@ -219,21 +264,23 @@ export async function updateMemberRole(
 ) {
   await assertOwnerOrAdmin(groupId, userId);
 
-  const member = await prisma.groupMember.findUnique({
-    where: { groupId_userId: { groupId, userId: targetUserId } },
-  });
+  const member = await getMembership(groupId, targetUserId);
   if (!member || !member.isActive) {
     throw new NotFoundError("Member not found");
   }
 
   if (member.role === "owner") {
-    throw new ForbiddenError("Cannot change the owner\'s role");
+    throw new ForbiddenError("Cannot change the owner's role");
   }
 
-  const updated = await prisma.groupMember.update({
-    where: { groupId_userId: { groupId, userId: targetUserId } },
-    data: { role: newRole },
-  });
+  const updated: GroupMember = {
+    ...member,
+    role: newRole,
+  };
+  await docRef(
+    collectionNames.groupMembers,
+    groupMemberId(groupId, targetUserId),
+  ).set(cleanForFirestore(updated));
 
   return {
     userId: updated.userId,
@@ -253,25 +300,48 @@ export async function removeMember(
     throw new ForbiddenError("Owner cannot remove themselves");
   }
 
-  const member = await prisma.groupMember.findUnique({
-    where: { groupId_userId: { groupId, userId: targetUserId } },
-  });
+  const member = await getMembership(groupId, targetUserId);
   if (!member || !member.isActive) {
     throw new NotFoundError("Member not found");
   }
 
-  await prisma.groupMember.update({
-    where: { groupId_userId: { groupId, userId: targetUserId } },
-    data: { isActive: false },
-  });
+  await docRef(
+    collectionNames.groupMembers,
+    groupMemberId(groupId, targetUserId),
+  ).set(cleanForFirestore({ ...member, isActive: false }));
 }
 
-// --- Helper functions ---
+async function getMembership(groupId: string, userId: string) {
+  return getDoc<GroupMember>(
+    collectionNames.groupMembers,
+    groupMemberId(groupId, userId),
+  );
+}
+
+async function getActiveMembers(groupId: string) {
+  return getQuery<GroupMember>(
+    collectionRef(collectionNames.groupMembers)
+      .where("groupId", "==", groupId)
+      .where("isActive", "==", true),
+  );
+}
+
+async function ensureBalance(groupId: string, userId: string) {
+  const existing = await getDoc<Balance>(
+    collectionNames.balances,
+    balanceId(groupId, userId),
+  );
+  if (existing) {
+    return;
+  }
+
+  await docRef(collectionNames.balances, balanceId(groupId, userId)).set(
+    cleanForFirestore({ groupId, userId, balance: 0 }),
+  );
+}
 
 async function assertOwner(groupId: string, userId: string) {
-  const membership = await prisma.groupMember.findUnique({
-    where: { groupId_userId: { groupId, userId } },
-  });
+  const membership = await getMembership(groupId, userId);
 
   if (!membership || !membership.isActive) {
     throw new NotFoundError("Group not found");
@@ -282,9 +352,7 @@ async function assertOwner(groupId: string, userId: string) {
 }
 
 async function assertOwnerOrAdmin(groupId: string, userId: string) {
-  const membership = await prisma.groupMember.findUnique({
-    where: { groupId_userId: { groupId, userId } },
-  });
+  const membership = await getMembership(groupId, userId);
 
   if (!membership || !membership.isActive) {
     throw new NotFoundError("Group not found");

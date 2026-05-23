@@ -1,7 +1,6 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
-import { config } from "./config";
 import { logger } from "./middleware/logger";
 import { errorHandler } from "./middleware/error-handler";
 import { authenticate } from "./middleware/auth";
