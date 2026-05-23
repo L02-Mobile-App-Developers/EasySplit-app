@@ -1,17 +1,20 @@
 import TopAppBar from "@/components/TopAppBar";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { AntDesign, MaterialIcons } from "@expo/vector-icons";
+import { Picker } from "@react-native-picker/picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
 import {
-  Alert,
-  Image,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
+    Alert,
+    Image,
+    Modal,
+    Pressable,
+    ScrollView,
+    Text,
+    TextInput,
+    View
 } from "react-native";
+import { Calendar } from "react-native-calendars";
 
 const participants = [
   {
@@ -47,6 +50,12 @@ export default function AddExpenseScreen() {
   const [amount, setAmount] = useState("850000");
   const [payer, setPayer] = useState("Bạn (Khoa)");
   const [dateTime, setDateTime] = useState("Hôm nay, 12:30");
+  const [showPayerModal, setShowPayerModal] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [tempDate, setTempDate] = useState<Date>(new Date());
+  const [showCustomPicker, setShowCustomPicker] = useState(false);
+  const [selectedHour, setSelectedHour] = useState<number>(selectedDate.getHours());
+  const [selectedMinute, setSelectedMinute] = useState<number>(selectedDate.getMinutes());
   const [note, setNote] = useState("");
   const [splitMode, setSplitMode] =
     useState<(typeof splitModes)[number]>("CHIA ĐỀU");
@@ -89,6 +98,25 @@ export default function AddExpenseScreen() {
       [{ text: "OK", onPress: () => router.back() }],
     );
   };
+
+  const formatDateTimeValue = (d: Date) => {
+    try {
+      const datePart = d.toLocaleDateString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+      const timePart = d.toLocaleTimeString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      return `${datePart}, ${timePart}`;
+    } catch (e) {
+      return d.toString();
+    }
+  };
+
+  
 
   return (
     <View style={{ flex: 1, backgroundColor: "#F3F4F6" }}>
@@ -190,6 +218,7 @@ export default function AddExpenseScreen() {
               NGƯỜI TRẢ
             </Text>
             <Pressable
+              onPress={() => setShowPayerModal(true)}
               style={{
                 backgroundColor: backgroundWhite,
                 borderRadius: 14,
@@ -221,6 +250,76 @@ export default function AddExpenseScreen() {
                 color={tabIconDefault}
               />
             </Pressable>
+
+              <Modal visible={showPayerModal} transparent animationType="slide">
+                <View
+                  style={{
+                    flex: 1,
+                    justifyContent: "flex-end",
+                    backgroundColor: "rgba(0,0,0,0.3)",
+                  }}
+                >
+                  <View
+                    style={{
+                      backgroundColor: backgroundWhite,
+                      padding: 16,
+                      borderTopLeftRadius: 16,
+                      borderTopRightRadius: 16,
+                      maxHeight: "60%",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 16,
+                        fontWeight: "700",
+                        marginBottom: 12,
+                        color: textColor,
+                      }}
+                    >
+                      Chọn người trả
+                    </Text>
+                    <ScrollView>
+                      {participants.map((p) => (
+                        <Pressable
+                          key={p.id}
+                          onPress={() => {
+                            setPayer(`${p.name}`);
+                            setShowPayerModal(false);
+                          }}
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 12,
+                            paddingVertical: 10,
+                          }}
+                        >
+                          <Image
+                            source={{ uri: p.avatar }}
+                            style={{ width: 36, height: 36, borderRadius: 999 }}
+                          />
+                          <Text style={{ fontSize: 16, color: textColor }}>
+                            {p.name}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                    <Pressable
+                      onPress={() => setShowPayerModal(false)}
+                      style={{
+                        marginTop: 8,
+                        alignItems: "center",
+                        paddingVertical: 12,
+                        borderRadius: 10,
+                        backgroundColor: "#F3F4F6",
+                      }}
+                    >
+                      <Text style={{ color: "#374151", fontWeight: "700" }}>
+                        Hủy
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </Modal>
           </View>
 
           <View>
@@ -235,6 +334,12 @@ export default function AddExpenseScreen() {
               NGÀY GIỜ
             </Text>
             <Pressable
+              onPress={() => {
+                setTempDate(selectedDate);
+                setSelectedHour(selectedDate.getHours());
+                setSelectedMinute(selectedDate.getMinutes());
+                setShowCustomPicker(true);
+              }}
               style={{
                 backgroundColor: backgroundWhite,
                 borderRadius: 14,
@@ -256,6 +361,77 @@ export default function AddExpenseScreen() {
                 color={tabIconDefault}
               />
             </Pressable>
+
+            {showCustomPicker && (
+              <Modal visible={showCustomPicker} transparent animationType="slide">
+                <View
+                  style={{
+                    flex: 1,
+                    justifyContent: "flex-end",
+                    backgroundColor: "rgba(0,0,0,0.3)",
+                  }}
+                >
+                  <View
+                    style={{
+                      backgroundColor: backgroundWhite,
+                      padding: 16,
+                      borderTopLeftRadius: 16,
+                      borderTopRightRadius: 16,
+                    }}
+                  >
+                    <View style={{ marginBottom: 8 }}>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                        <Text style={{ fontSize: 16, fontWeight: "700", color: textColor }}>Chọn ngày & giờ</Text>
+                        <View style={{ flexDirection: "row", gap: 8 }}>
+                          <Pressable onPress={() => { setShowCustomPicker(false); setTempDate(selectedDate); }} style={{ padding: 8 }}>
+                            <Text style={{ color: "#6B7280", fontWeight: "700" }}>Hủy</Text>
+                          </Pressable>
+                          <Pressable onPress={() => {
+                              const newDate = new Date(tempDate);
+                              newDate.setHours(selectedHour, selectedMinute, 0, 0);
+                              setSelectedDate(newDate);
+                              setDateTime(formatDateTimeValue(newDate));
+                              setShowCustomPicker(false);
+                            }} style={{ padding: 8 }}>
+                            <Text style={{ color: darkGreen, fontWeight: "700" }}>Lưu</Text>
+                          </Pressable>
+                        </View>
+                      </View>
+
+                      <Calendar
+                        onDayPress={(day) => {
+                          const [y, m, d] = day.dateString.split("-").map(Number);
+                          const nd = new Date(y, m - 1, d, tempDate.getHours(), tempDate.getMinutes());
+                          setTempDate(nd);
+                        }}
+                        markedDates={{ [tempDate.toISOString().split("T")[0]]: { selected: true } }}
+                        theme={{ todayTextColor: darkGreen }}
+                      />
+
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 12, alignItems: "center" }}>
+                        <View style={{ flex: 1, marginRight: 8 }}>
+                          <Text style={{ color: textColor, fontWeight: "700", marginBottom: 6 }}>Giờ</Text>
+                          <Picker selectedValue={selectedHour} onValueChange={(v) => setSelectedHour(Number(v))}>
+                            {Array.from({ length: 24 }).map((_, i) => (
+                              <Picker.Item key={i} label={String(i).padStart(2, "0")} value={i} />
+                            ))}
+                          </Picker>
+                        </View>
+                        <View style={{ width: 100 }}>
+                          <Text style={{ color: textColor, fontWeight: "700", marginBottom: 6 }}>Phút</Text>
+                          <Picker selectedValue={selectedMinute} onValueChange={(v) => setSelectedMinute(Number(v))}>
+                            {Array.from({ length: 12 }).map((_, i) => {
+                              const val = i * 5;
+                              return <Picker.Item key={val} label={String(val).padStart(2, "0")} value={val} />;
+                            })}
+                          </Picker>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              </Modal>
+            )}
           </View>
 
           <View>
