@@ -1,7 +1,13 @@
 import TopAppBar from "@/components/TopAppBar";
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import {
+  Image,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View
+} from "react-native";
 
 import { expenseService } from "@/api/services/expense.service";
 import { groupService } from "@/api/services/group.service";
@@ -306,7 +312,7 @@ export default function GroupDetail() {
             <Text style={{ fontSize: 16, color: "white" }}>Thêm khoản chi</Text>
           </TouchableOpacity>
 
-          <View
+          <TouchableOpacity
             style={{
               flexDirection: "row",
               alignItems: "center",
@@ -316,6 +322,7 @@ export default function GroupDetail() {
               paddingHorizontal: 28,
               borderRadius: 10,
             }}
+            onPress={() => router.push(`/group/${id}/pay`)}
           >
             <MaterialCommunityIcons
               name="cash-multiple"
@@ -323,7 +330,7 @@ export default function GroupDetail() {
               color="gray"
             />
             <Text style={{ fontSize: 16, color: "gray" }}>Thanh toán</Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* User to repay debt */}
@@ -339,7 +346,7 @@ export default function GroupDetail() {
         </View>
         {memberToPay.map((user) => (
           <View
-            key={user.toUserId}
+            key={user.fromUserId}
             style={{
               width: "95%",
               flexDirection: "row",
