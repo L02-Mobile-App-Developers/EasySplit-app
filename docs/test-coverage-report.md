@@ -11,12 +11,12 @@
 | Thành phần | Test suites | Tests | Statements | Branches | Functions | Lines | Đạt ngưỡng 70% |
 |------------|-------------|-------|------------|----------|-----------|-------|----------------|
 | **Frontend** | 21 / 21 ✅ | 65 / 65 ✅ | **98.17%** | **86.04%** | **100%** | **98.08%** | ✅ Có |
-| **Backend** | 13 / 13 ✅ | 83 / 83 ✅ | **80.02%** | **65.97%** | **79.60%** | **79.83%** | ✅ Statements/Lines/Functions; ⚠️ Branches |
+| **Backend** | 13 / 13 ✅ | 115 / 115 ✅ | **93.55%** | **75.44%** | **90.78%** | **93.77%** | ✅ Có |
 
 **Kết luận ngắn**
 
 - Frontend: coverage logic nghiệp vụ (API, store, hooks) rất cao; CI fail nếu dưới 70% mọi chỉ số.
-- Backend: đạt ~80% statements; **settlement** và **branch coverage** là điểm cần cải thiện tiếp.
+- Backend: tất cả chỉ số ≥ 70%; ngưỡng CI trong `jest.config.js` đã nâng lên 70%.
 - Màn hình Expo (`app/`) chưa nằm trong phạm vi coverage frontend (chủ ý — tránh mock router nặng).
 
 ---
@@ -28,16 +28,18 @@
 ```bash
 cd frontend
 npm run test:coverage
-# Báo cáo HTML/LCOV: frontend/coverage/lcov-report/index.html
 ```
+
+**HTML report:** `frontend/coverage/index.html` (hoặc `frontend/coverage/lcov-report/index.html`)
 
 ### Backend
 
 ```bash
 cd backend
-npx jest --coverage --colors=never tests/unit
-# Báo cáo HTML/LCOV: backend/coverage/lcov-report/index.html
+npm run test:coverage
 ```
+
+**HTML report:** `backend/coverage/index.html` (hoặc `backend/coverage/lcov-report/index.html`)
 
 ### CI (GitHub Actions)
 

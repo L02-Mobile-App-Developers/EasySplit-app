@@ -18,7 +18,14 @@ jest.mock('@/lib/entitlement', () => ({
 jest.mock('@/config', () => ({ config: { freeTier: { smartSettlePerMonth: 1 } } }));
 
 jest.mock('@/lib/firestore-db', () => ({
-  collectionNames: { groupMembers: 'group_members', balances: 'balances', subscriptions: 'subscriptions', auditLogs: 'audit_logs', settlements: 'settlements' },
+  collectionNames: {
+    groupMembers: 'group_members',
+    balances: 'balances',
+    subscriptions: 'subscriptions',
+    auditLogs: 'audit_logs',
+    settlements: 'settlements',
+    groups: 'groups',
+  },
   groupMemberId: (g: string, u: string) => `${g}_${u}`,
   subscriptionId: (u: string) => u,
   collectionRef: () => ({ where() { return this; }, firestore: { runTransaction: async (fn: any) => fn({ set: jest.fn(), delete: jest.fn(), update: jest.fn() }) } }),
@@ -177,5 +184,170 @@ describe('settlement.service', () => {
     await expect(
       settlementService.createSettlement('g1', 'u1', { fromUserId: 'u2', toUserId: 'u2', amount: 10 }),
     ).rejects.toHaveProperty('code', 'VALIDATION_ERROR');
+  });
+
+  test('createSettlement - fromUserId must be active member', async () => {
+    mockGetDoc.mockResolvedValueOnce({ groupId: 'g1', userId: 'u1', isActive: true });
+    mockGetQueryInTransaction.mockResolvedValueOnce([{ userId: 'u3' }]);
+    mockGetDocInTransaction.mockResolvedValueOnce({ balance: -10 });
+    mockGetDocInTransaction.mockResolvedValueOnce({ balance: 10 });
+
+    await expect(
+      settlementService.createSettlement('g1', 'u1', { fromUserId: 'u2', toUserId: 'u3', amount: 5 }),
+    ).rejects.toHaveProperty('code', 'VALIDATION_ERROR');
+  });
+
+  test('createSettlement - receiver must have positive balance', async () => {
+    mockGetDoc.mockResolvedValueOnce({ groupId: 'g1', userId: 'u1', isActive: true });
+    mockGetQueryInTransaction.mockResolvedValueOnce([{ userId: 'u2' }, { userId: 'u3' }]);
+    mockGetDocInTransaction.mockResolvedValueOnce({ balance: -10 });
+    mockGetDocInTransaction.mockResolvedValueOnce({ balance: 0 });
+
+    await expect(
+      settlementService.createSettlement('g1', 'u1', { fromUserId: 'u2', toUserId: 'u3', amount: 5 }),
+    ).rejects.toHaveProperty('code', 'VALIDATION_ERROR');
+  });
+
+  test('getSettlement - not found', async () => {
+    mockGetDoc.mockResolvedValueOnce({ groupId: 'g1', userId: 'u1', isActive: true });
+    mockGetDoc.mockResolvedValueOnce(null);
+
+    await expect(settlementService.getSettlement('g1', 'missing', 'u1')).rejects.toHaveProperty(
+      'code',
+      'NOT_FOUND',
+    );
+  });
+
+  test('getSettlement - wrong group', async () => {
+    mockGetDoc.mockResolvedValueOnce({ groupId: 'g1', userId: 'u1', isActive: true });
+    mockGetDoc.mockResolvedValueOnce({
+      id: 's1',
+      groupId: 'other',
+      fromUserId: 'u2',
+      toUserId: 'u3',
+      createdBy: 'u1',
+    });
+
+    await expect(settlementService.getSettlement('g1', 's1', 'u1')).rejects.toHaveProperty(
+      'code',
+      'NOT_FOUND',
+    );
+  });
+
+  test('getSettlement - returns enriched settlement', async () => {
+    const settlement = {
+      id: 's1',
+      groupId: 'g1',
+      fromUserId: 'u2',
+      toUserId: 'u3',
+      amount: 10,
+      note: null,
+      createdBy: 'u1',
+      createdAt: new Date(),
+    };
+    mockGetDoc.mockResolvedValueOnce({ groupId: 'g1', userId: 'u1', isActive: true });
+    mockGetDoc.mockResolvedValueOnce(settlement);
+    mockPublicUserMap.mockResolvedValue(
+      new Map([
+        ['u2', { id: 'u2', displayName: 'From' }],
+        ['u3', { id: 'u3', displayName: 'To' }],
+        ['u1', { id: 'u1', displayName: 'Creator' }],
+      ]),
+    );
+
+    const res = await settlementService.getSettlement('g1', 's1', 'u1');
+    expect(res.fromUser?.displayName).toBe('From');
+    expect(res.toUser?.displayName).toBe('To');
+  });
+
+  test('getSettlements - enriches paginated items', async () => {
+    mockGetDoc.mockResolvedValueOnce({ groupId: 'g1', userId: 'u1', isActive: true });
+    mockGetQuery.mockResolvedValueOnce([
+      {
+        id: 's1',
+        groupId: 'g1',
+        fromUserId: 'u2',
+        toUserId: 'u3',
+        amount: 5,
+        note: null,
+        createdBy: 'u1',
+        createdAt: new Date(),
+      },
+    ]);
+    mockPublicUserMap.mockResolvedValue(new Map([['u2', { id: 'u2' }]]));
+
+    const res = await settlementService.getSettlements('g1', 'u1', 1, 10);
+    expect(res.items).toHaveLength(1);
+    expect(res.pagination.total).toBe(1);
+  });
+
+  test('groupSettlement - simulate mode', async () => {
+    mockAssertPremiumGroup.mockResolvedValue(undefined);
+    mockGetDoc
+      .mockResolvedValueOnce({ groupId: 'g1', userId: 'u1', isActive: true })
+      .mockResolvedValueOnce({ groupId: 'g1', userId: 'u1', isActive: true })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    mockIsPremiumSubscriptionActive.mockReturnValue(false);
+    mockGetQuery
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { userId: 'uA', balance: 30 },
+        { userId: 'uB', balance: -30 },
+      ]);
+
+    const res = await settlementService.groupSettlement('g1', 'u1', { mode: 'simulate' });
+    expect(res.mode).toBe('simulate');
+    expect(res.totalTransfers).toBe(1);
+  });
+
+  test('groupSettlement - commit mode', async () => {
+    mockIsPremiumSubscriptionActive.mockReturnValue(true);
+    mockGetDocInTransaction
+      .mockResolvedValueOnce({ userId: 'u1', isActive: true })
+      .mockResolvedValueOnce({ id: 'g1', ownerId: 'u1' })
+      .mockResolvedValueOnce({ plan: 'premium', status: 'active' });
+    mockGetQueryInTransaction.mockResolvedValueOnce([
+      { userId: 'uA', balance: 40 },
+      { userId: 'uB', balance: -40 },
+    ]);
+
+    const res = await settlementService.groupSettlement('g1', 'u1', {
+      mode: 'commit',
+      note: 'close out',
+    });
+
+    expect(res.mode).toBe('commit');
+    expect(res.totalSettlements).toBe(1);
+  });
+
+  test('groupSettlement - commit requires premium', async () => {
+    mockIsPremiumSubscriptionActive.mockReturnValue(false);
+    mockGetDocInTransaction
+      .mockResolvedValueOnce({ userId: 'u1', isActive: true })
+      .mockResolvedValueOnce({ id: 'g1', ownerId: 'u1' })
+      .mockResolvedValueOnce({ plan: 'free', status: 'active' });
+
+    await expect(
+      settlementService.groupSettlement('g1', 'u1', { mode: 'commit' }),
+    ).rejects.toHaveProperty('code', 'PREMIUM_REQUIRED');
+  });
+
+  test('getDebts - enriches users on edges', async () => {
+    mockGetDoc.mockResolvedValueOnce({ groupId: 'g1', userId: 'u1', isActive: true });
+    mockGetQuery.mockResolvedValueOnce([
+      { userId: 'uA', balance: 25 },
+      { userId: 'uB', balance: -25 },
+    ]);
+    mockPublicUserMap.mockResolvedValue(
+      new Map([
+        ['uB', { id: 'uB', displayName: 'Debtor' }],
+        ['uA', { id: 'uA', displayName: 'Creditor' }],
+      ]),
+    );
+
+    const res = await settlementService.getDebts('g1', 'u1');
+    expect(res[0].fromUser?.displayName).toBe('Debtor');
+    expect(res[0].toUser?.displayName).toBe('Creditor');
   });
 });

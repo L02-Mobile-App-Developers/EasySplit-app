@@ -42,6 +42,48 @@ describe('user.service', () => {
     expect(res.plan).toBe('free');
   });
 
+  test('getMe - returns profile', async () => {
+    mockGetDoc.mockResolvedValue({
+      id: 'u1',
+      displayName: 'Tester',
+      email: 'test@x.com',
+      avatarUrl: null,
+      createdAt: new Date(),
+    });
+
+    const res = await userService.getMe('u1');
+    expect(res.displayName).toBe('Tester');
+  });
+
+  test('updateMe - updates display name and avatar', async () => {
+    mockGetDoc.mockResolvedValue({
+      id: 'u1',
+      displayName: 'Old',
+      email: 'test@x.com',
+      avatarUrl: null,
+      createdAt: new Date(),
+    });
+
+    const res = await userService.updateMe('u1', {
+      displayName: 'New',
+      avatarUrl: 'https://cdn/avatar.png',
+    });
+    expect(res.displayName).toBe('New');
+    expect(res.avatarUrl).toBe('https://cdn/avatar.png');
+  });
+
+  test('getSubscription - returns stored subscription', async () => {
+    mockGetDoc.mockResolvedValue({
+      plan: 'premium',
+      status: 'active',
+      currentPeriodStart: new Date('2026-01-01'),
+      currentPeriodEnd: new Date('2026-12-31'),
+    });
+
+    const res = await userService.getSubscription('u1');
+    expect(res.plan).toBe('premium');
+  });
+
   test('getUsage - calculates group and monthly smart settle usage', async () => {
     const now = new Date();
     mockGetQuery

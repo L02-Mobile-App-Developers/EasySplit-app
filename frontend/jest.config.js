@@ -17,7 +17,7 @@ module.exports = {
     "!**/__tests__/**",
   ],
   coverageDirectory: "coverage",
-  coverageReporters: ["lcov", "text", "text-summary"],
+  coverageReporters: ["html", "lcov", "text", "text-summary"],
   coverageThreshold: {
     global: {
       branches: 70,

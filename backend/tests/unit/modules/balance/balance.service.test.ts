@@ -6,6 +6,7 @@ const mockGetPublicUser: any = jest.fn();
 
 jest.mock('@/lib/firestore-db', () => ({
   collectionNames: { balances: 'balances', groupMembers: 'group_members' },
+  collectionRef: () => ({ where() { return this; } }),
   getDoc: (...a: any[]) => mockGetDoc(...a),
   getQuery: (...a: any[]) => mockGetQuery(...a),
   getPublicUser: (...a: any[]) => mockGetPublicUser(...a),
@@ -35,6 +36,25 @@ describe('balance.service', () => {
     const res = await balanceService.getMyBalance('g1', 'u1');
     expect(res.balance).toBe(0);
     expect(res.user).toBeNull();
+  });
+
+  test('getBalances - returns sorted enriched balances', async () => {
+    mockGetDoc.mockResolvedValueOnce({ groupId: 'g1', userId: 'u1', isActive: true });
+    mockGetQuery.mockResolvedValueOnce([
+      { userId: 'u1', balance: 5, groupId: 'g1' },
+      { userId: 'u2', balance: 20, groupId: 'g1' },
+    ]);
+    mockGetPublicUser.mockImplementation(async (id: string) => ({
+      id,
+      displayName: id,
+      email: `${id}@x.com`,
+      avatarUrl: null,
+    }));
+
+    const res = await balanceService.getBalances('g1', 'u1');
+    expect(res).toHaveLength(2);
+    expect(res[0].balance).toBe(20);
+    expect(res[0].user?.displayName).toBe('u2');
   });
 
   test('getMyBalance - returns existing balance with user', async () => {

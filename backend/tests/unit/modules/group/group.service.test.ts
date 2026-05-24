@@ -142,4 +142,95 @@ describe('group.service', () => {
     mockGetDoc.mockResolvedValue({ userId: 'u1', role: 'owner', isActive: true });
     await expect(groupService.removeMember('g1', 'u1', 'u1')).rejects.toHaveProperty('code', 'FORBIDDEN');
   });
+
+  test('getGroup - returns group with member count', async () => {
+    mockGetDoc.mockResolvedValueOnce({ userId: 'u1', role: 'member', isActive: true });
+    mockGetDoc.mockResolvedValueOnce({ id: 'g1', name: 'Trip', category: 'travel', updatedAt: new Date() });
+    mockGetQuery.mockResolvedValueOnce([{ userId: 'u1' }, { userId: 'u2' }]);
+
+    const res = await groupService.getGroup('g1', 'u1');
+    expect(res.name).toBe('Trip');
+    expect(res.memberCount).toBe(2);
+    expect(res.role).toBe('member');
+  });
+
+  test('getGroups - skips missing groups', async () => {
+    mockGetQuery.mockResolvedValueOnce([
+      { groupId: 'g1', role: 'member', isActive: true },
+      { groupId: 'missing', role: 'member', isActive: true },
+    ]);
+    mockGetDoc
+      .mockResolvedValueOnce({ id: 'g1', name: 'G1', updatedAt: new Date('2026-01-02') })
+      .mockResolvedValueOnce(null);
+
+    const res = await groupService.getGroups('u1');
+    expect(res).toHaveLength(1);
+    expect(res[0].id).toBe('g1');
+  });
+
+  test('addMember - reactivates inactive member', async () => {
+    mockGetDoc.mockResolvedValueOnce({ userId: 'u1', role: 'owner', isActive: true });
+    mockGetDoc.mockResolvedValueOnce({ id: 'target' });
+    mockGetDoc.mockResolvedValueOnce({ userId: 'target', isActive: false, role: 'member' });
+    mockGetDoc.mockResolvedValueOnce(null);
+
+    const res = await groupService.addMember('g1', 'u1', 'target', 'admin');
+    expect(res.role).toBe('admin');
+  });
+
+  test('updateMemberRole - success for non-owner member', async () => {
+    mockGetDoc.mockResolvedValueOnce({ userId: 'u1', role: 'owner', isActive: true });
+    mockGetDoc.mockResolvedValueOnce({ userId: 't', role: 'member', isActive: true, joinedAt: new Date() });
+
+    const res = await groupService.updateMemberRole('g1', 'u1', 't', 'admin');
+    expect(res.role).toBe('admin');
+  });
+
+  test('updateGroup - group missing after permission check', async () => {
+    mockGetDoc.mockResolvedValueOnce({ userId: 'u1', role: 'owner', isActive: true });
+    mockGetDoc.mockResolvedValueOnce(null);
+
+    await expect(groupService.updateGroup('g1', 'u1', { name: 'X' })).rejects.toHaveProperty(
+      'code',
+      'NOT_FOUND',
+    );
+  });
+
+  test('closeGroup - group missing after permission check', async () => {
+    mockGetDoc.mockResolvedValueOnce({ userId: 'u1', role: 'owner', isActive: true });
+    mockGetDoc.mockResolvedValueOnce(null);
+
+    await expect(groupService.closeGroup('g1', 'u1')).rejects.toHaveProperty('code', 'NOT_FOUND');
+  });
+
+  test('getMembers - skips members without user record', async () => {
+    mockGetDoc.mockResolvedValueOnce({ userId: 'u1', role: 'owner', isActive: true });
+    mockGetQuery.mockResolvedValueOnce([
+      { userId: 'm1', role: 'member', joinedAt: new Date() },
+      { userId: 'ghost', role: 'member', joinedAt: new Date() },
+    ]);
+    mockGetDoc
+      .mockResolvedValueOnce({ id: 'm1', displayName: 'M1', email: 'm1@x', avatarUrl: null })
+      .mockResolvedValueOnce(null);
+
+    const res = await groupService.getMembers('g1', 'u1');
+    expect(res).toHaveLength(1);
+  });
+
+  test('addMember - insufficient permissions for regular member', async () => {
+    mockGetDoc.mockResolvedValueOnce({ userId: 'u1', role: 'member', isActive: true });
+    await expect(groupService.addMember('g1', 'u1', 'target', 'member')).rejects.toHaveProperty(
+      'code',
+      'FORBIDDEN',
+    );
+  });
+
+  test('removeMember - member not found', async () => {
+    mockGetDoc.mockResolvedValueOnce({ userId: 'u1', role: 'owner', isActive: true });
+    mockGetDoc.mockResolvedValueOnce(null);
+    await expect(groupService.removeMember('g1', 'u1', 'ghost')).rejects.toHaveProperty(
+      'code',
+      'NOT_FOUND',
+    );
+  });
 });

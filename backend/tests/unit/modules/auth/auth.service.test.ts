@@ -74,4 +74,89 @@ describe('auth.service', () => {
     });
     await expect(authService.refreshToken('bad')).rejects.toHaveProperty('code', 'UNAUTHORIZED');
   });
+
+  test('login - success returns tokens', async () => {
+    mockGetFirstByField.mockResolvedValue({
+      id: 'u1',
+      email: 'a@x.com',
+      passwordHash: 'hash:secret',
+      displayName: 'A',
+      avatarUrl: null,
+      createdAt: new Date(),
+    });
+
+    const res = await authService.login({ email: 'a@x.com', password: 'secret' });
+    expect(res.accessToken).toBe('at');
+    expect(res.user.email).toBe('a@x.com');
+  });
+
+  test('login - wrong password throws unauthorized', async () => {
+    mockGetFirstByField.mockResolvedValue({
+      id: 'u1',
+      email: 'a@x.com',
+      passwordHash: 'hash:secret',
+      displayName: 'A',
+      avatarUrl: null,
+      createdAt: new Date(),
+    });
+
+    await expect(authService.login({ email: 'a@x.com', password: 'wrong' })).rejects.toHaveProperty(
+      'code',
+      'UNAUTHORIZED',
+    );
+  });
+
+  test('getCurrentUser - returns public user', async () => {
+    mockGetDoc.mockResolvedValue({
+      id: 'u1',
+      email: 'a@x.com',
+      displayName: 'A',
+      avatarUrl: null,
+      createdAt: new Date(),
+    });
+
+    const res = await authService.getCurrentUser('u1');
+    expect(res.id).toBe('u1');
+  });
+
+  test('refreshToken - success returns new tokens', async () => {
+    mockVerifyToken.mockReturnValue({ userId: 'u1', email: 'a@x.com' });
+    mockGetDoc.mockResolvedValue({
+      id: 'u1',
+      email: 'a@x.com',
+      displayName: 'A',
+      avatarUrl: null,
+      createdAt: new Date(),
+    });
+
+    const res = await authService.refreshToken('refresh-token');
+    expect(res.accessToken).toBe('at');
+    expect(res.refreshToken).toBe('rt');
+  });
+
+  test('register - rejects duplicate email', async () => {
+    mockGetFirstByField.mockResolvedValue({ id: 'existing', email: 'a@x.com' });
+    await expect(
+      authService.register({ email: 'a@x.com', displayName: 'A', password: 'pw' }),
+    ).rejects.toHaveProperty('code', 'CONFLICT');
+  });
+
+  test('syncFirebaseUser - updates email on existing firebase account', async () => {
+    mockGetFirstByField
+      .mockResolvedValueOnce({
+        id: 'u1',
+        firebaseUid: 'f1',
+        email: 'old@x.com',
+        displayName: 'Old',
+        avatarUrl: null,
+        createdAt: new Date(),
+      })
+      .mockResolvedValueOnce(null);
+    const res = await authService.syncFirebaseUser({
+      firebaseUid: 'f1',
+      email: 'new@x.com',
+      displayName: 'New Name',
+    });
+    expect(res.email).toBe('new@x.com');
+  });
 });

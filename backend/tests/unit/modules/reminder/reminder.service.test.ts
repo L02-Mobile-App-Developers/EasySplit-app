@@ -68,6 +68,58 @@ describe('reminder.service', () => {
     expect(res.status).toBe('failed');
   });
 
+  test('getReminders - returns paginated enriched reminders', async () => {
+    const now = new Date();
+    mockGetQuery.mockResolvedValueOnce([
+      {
+        id: 'r1',
+        groupId: 'g1',
+        targetUserId: 'u2',
+        createdBy: 'u1',
+        createdAt: now,
+        status: 'queued',
+      },
+    ]);
+    mockPublicUserMap.mockResolvedValue(
+      new Map([
+        ['u2', { id: 'u2', displayName: 'U2' }],
+        ['u1', { id: 'u1', displayName: 'U1' }],
+      ]),
+    );
+
+    const res = await reminderService.getReminders('g1', 'u1', 1, 10);
+    expect(res.items).toHaveLength(1);
+    expect(res.items[0].targetUser?.displayName).toBe('U2');
+  });
+
+  test('createReminder - rejects duplicate targets within 24 hours', async () => {
+    const now = new Date();
+    mockGetQuery
+      .mockResolvedValueOnce([{ userId: 'u1', isActive: true }, { userId: 'u2', isActive: true }])
+      .mockResolvedValueOnce([{ userId: 'u2', balance: -15 }])
+      .mockResolvedValueOnce([
+        { targetUserId: 'u2', createdAt: now, message: 'Please settle your outstanding debt in the group.' },
+      ]);
+
+    await expect(
+      reminderService.createReminder('g1', 'u1', { targetUserIds: ['u2'] }),
+    ).rejects.toHaveProperty('code', 'VALIDATION_ERROR');
+  });
+
+  test('cancelReminder - rejects non-queued reminder', async () => {
+    mockGetDoc.mockResolvedValue({
+      id: 'r1',
+      groupId: 'g1',
+      createdBy: 'u1',
+      status: 'sent',
+    });
+
+    await expect(reminderService.cancelReminder('g1', 'r1', 'u1')).rejects.toHaveProperty(
+      'code',
+      'VALIDATION_ERROR',
+    );
+  });
+
   test('createReminder - success enqueues reminders', async () => {
     mockGetQuery
       .mockResolvedValueOnce([{ userId: 'u1', isActive: true }, { userId: 'u2', isActive: true }]) // activeMembers
