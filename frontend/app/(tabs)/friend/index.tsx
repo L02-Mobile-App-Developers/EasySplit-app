@@ -7,6 +7,7 @@ import {
 } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
+import * as friendService from "@/api/services/friend.service";
 import {
     ActivityIndicator,
     Image,
@@ -372,25 +373,56 @@ export default function FriendScreen() {
   useEffect(() => {
     const loadFriends = async () => {
       setLoading(true);
-      // Temporarily skip API fetch to speed up local development
-      // const data = await fetchFriends() as any;
-      // setFriendRequests(data.requests);
-      // setFriendsList(data.friends);
-      setFriendRequests(mockFriendRequests);
-      setFriendsList(mockFriendsList);
+      try {
+        const [friends, requests] = await Promise.all([
+          friendService.listFriends(),
+          friendService.listIncomingRequests(),
+        ]);
+        setFriendsList(friends);
+        setFriendRequests(requests);
+      } catch (err) {
+        // fallback to mock data on error
+        setFriendRequests(mockFriendRequests);
+        setFriendsList(mockFriendsList);
+      }
       setLoading(false);
     };
     loadFriends();
   }, []);
 
   const handleAcceptRequest = (requestId: number) => {
-    console.log("Accept request:", requestId);
-    // TODO: Implement API call
+    (async () => {
+      try {
+        await friendService.acceptFriendRequest(String(requestId));
+        // reload lists
+        const [friends, requests] = await Promise.all([
+          friendService.listFriends(),
+          friendService.listIncomingRequests(),
+        ]);
+        setFriendsList(friends);
+        setFriendRequests(requests);
+      } catch (err) {
+        console.error(err);
+      }
+    })();
   };
 
   const handleRejectRequest = (requestId: number) => {
-    console.log("Reject request:", requestId);
-    // TODO: Implement API call
+    (async () => {
+      try {
+        await friendService.rejectFriendRequest(String(requestId));
+        const [friends, requests] = await Promise.all([
+          friendService.listFriends(),
+          friendService.listIncomingRequests(),
+        ]);
+        setFriendsList(friends);
+        setFriendRequests(requests);
+      } catch (err) {
+        console.error(err);
+        // fallback optimistic remove
+        setFriendRequests((prev) => prev.filter((r) => r.id !== requestId));
+      }
+    })();
   };
 
   const handleFriendPress = (friendId: number) => {

@@ -4,6 +4,7 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import * as friendService from "@/api/services/friend.service";
 
 export default function AddFriend() {
   const { darkGreen } = useAppTheme();
@@ -16,12 +17,16 @@ export default function AddFriend() {
       return;
     }
 
-    setLoading(true);
-    setTimeout(() => {
+    try {
+      setLoading(true);
+      await friendService.sendFriendRequest(email);
       setLoading(false);
       Alert.alert("Thành công", `Đã gửi lời mời tới ${email}`);
       router.back();
-    }, 800);
+    } catch (err: any) {
+      setLoading(false);
+      Alert.alert("Lỗi", err?.response?.data?.error?.message || err.message || "Không thể gửi lời mời");
+    }
   };
 
   return (
