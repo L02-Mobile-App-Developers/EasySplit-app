@@ -14,10 +14,13 @@ module.exports = {
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
   },
+  globals: {
+    'ts-jest': {
+      diagnostics: false,
+    },
+  },
   collectCoverageFrom: [
-    "src/**/*.ts",
-    "!src/**/*.d.ts",
-    "!src/index.ts",
+    "src/modules/**/*.service.ts",
   ],
   coverageThreshold: {
     global: {

@@ -13,7 +13,7 @@ import {
 import { NotFoundError, ConflictError, ValidationError } from "../../lib/errors";
 
 export async function sendFriendRequest(fromUserId: string, toEmail: string) {
-  const to = await getFirstByField(collectionNames.users, "email", toEmail.toLowerCase());
+  const to = await getFirstByField<any>(collectionNames.users, "email", toEmail.toLowerCase());
   if (!to) throw new NotFoundError("User not found");
   if (to.id === fromUserId) throw new ValidationError("Cannot send friend request to yourself");
 

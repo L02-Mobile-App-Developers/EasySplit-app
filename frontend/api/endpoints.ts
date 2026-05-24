@@ -19,6 +19,18 @@ export const ENDPOINTS = {
     USAGE: "/me/usage",
   },
 
+  USERS: {
+    SEARCH: "/users",
+  },
+
+  FRIENDS: {
+    LIST: "/friends",
+    REQUESTS: "/friends/requests",
+    SEND: "/friends",
+    ACCEPT: (requestId: string) => `/friends/${requestId}/accept`,
+    REJECT: (requestId: string) => `/friends/${requestId}`,
+  },
+
   GROUPS: {
     LIST: "/groups", // post, get
 
