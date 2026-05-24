@@ -21,10 +21,10 @@ import {
   View,
 } from "react-native";
 
-const currentUser = useAuthStore.getState().user;
-
 export default function PayDetailScreen() {
   const { id, payId, amount: defaultAmount } = useLocalSearchParams();
+
+  const currentUser = useAuthStore.getState().user;
 
   const [members, setMembers] = useState<GroupMember[]>([]);
   const [selectedUser, setSelectedUser] = useState<GroupMember | null>(null);
