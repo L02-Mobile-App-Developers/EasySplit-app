@@ -3,6 +3,8 @@ import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
+// import { activityService } from "@/api/services/activity.service";
+
 // user to repay debt
 const user = [
   {
@@ -87,7 +89,43 @@ const groupedActivity = recentActivity.reduce(
 );
 
 export default function GroupDetail() {
-  const { id } = useLocalSearchParams();
+  const { groupId } = useLocalSearchParams();
+
+  //
+  //   const loadActivities = async () => {
+  //   try {
+  //     const response =
+  //       await activityService.getActivities(
+  //         groupId,
+  //         {
+  //           page: 1,
+  //           limit: 20,
+  //         },
+  //       );
+
+  //     console.log(response.items);
+  //   } catch (error) {
+  //     console.log(error);
+  //   }
+  // };
+
+  // const loadHistory = async () => {
+  //   try {
+  //     const response =
+  //       await activityService.getHistory(
+  //         groupId,
+  //         {
+  //           page: 1,
+  //           limit: 20,
+  //           type: "expense",
+  //         },
+  //       );
+
+  //     console.log(response.items);
+  //   } catch (error) {
+  //     console.log(error);
+  //   }
+  // };
 
   return (
     <View style={{ flex: 1, backgroundColor: "#F7F9FB" }}>
@@ -216,7 +254,7 @@ export default function GroupDetail() {
               paddingHorizontal: 12,
               borderRadius: 10,
             }}
-            onPress={() => router.push(`/group/${id}/add-expense`)}
+            onPress={() => router.push(`/group/${groupId}/add-expense`)}
           >
             <MaterialIcons name="add-circle-outline" size={24} color="white" />
             <Text style={{ fontSize: 16, color: "white" }}>Thêm khoản chi</Text>
@@ -350,7 +388,7 @@ export default function GroupDetail() {
               <TouchableOpacity
                 key={activity.id}
                 onPress={() =>
-                  router.push(`/group/${id}/expense/${activity.id}`)
+                  router.push(`/group/${groupId}/expense/${activity.id}`)
                 }
                 style={{
                   flexDirection: "row",

@@ -3,7 +3,6 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -17,6 +16,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/ThemedText";
 import { useAppTheme } from "@/hooks/useAppTheme";
+
+import { useAuth } from "@/hooks/useAuth";
+import { Alert } from "react-native";
 
 const MOCK_USERS = [
   {
@@ -37,29 +39,9 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const brandGreen = selected;
   const placeholderGray = "#9CA3AF";
-  const handleLogin = () => {
-    if (!email || !password) {
-      Alert.alert("Lỗi", "Vui lòng điền email và mật khẩu");
-      return;
-    }
 
-    const matchedUser = MOCK_USERS.find(
-      (user) =>
-        user.email.toLowerCase() === email.trim().toLowerCase() &&
-        user.password === password,
-    );
-
-    if (!matchedUser) {
-      Alert.alert(
-        "Lỗi",
-        "Email hoặc mật khẩu không đúng. Hãy thử tài khoản mẫu bên dưới.",
-      );
-      return;
-    }
-
-    Alert.alert("Thành công", `Xin chào ${matchedUser.name}`);
-    router.replace("/(tabs)");
-  };
+  const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
 
   return (
     <SafeAreaView
@@ -127,11 +109,37 @@ export default function Login() {
 
             <TouchableOpacity
               activeOpacity={0.85}
-              onPress={handleLogin}
+              disabled={loading}
+              onPress={async () => {
+                try {
+                  if (!email || !password) {
+                    Alert.alert("Lỗi", "Vui lòng nhập email và mật khẩu");
+                    return;
+                  }
+
+                  setLoading(true);
+
+                  await login(email, password);
+
+                  Alert.alert("Thành công", "Đăng nhập thành công");
+
+                  router.replace("/(tabs)");
+                } catch (error: any) {
+                  console.log(error?.response?.data || error);
+
+                  const message =
+                    error?.response?.data?.error?.message ||
+                    "Đăng nhập thất bại";
+
+                  Alert.alert("Lỗi", message);
+                } finally {
+                  setLoading(false);
+                }
+              }}
               style={[styles.button, { backgroundColor: brandGreen }]}
             >
               <ThemedText fontWeight="semibold" style={styles.buttonText}>
-                Đăng nhập
+                {loading ? "Đang đăng nhập..." : "Đăng nhập"}
               </ThemedText>
             </TouchableOpacity>
 
