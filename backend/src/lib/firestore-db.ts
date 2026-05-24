@@ -14,6 +14,8 @@ export const collectionNames = {
   subscriptions: "subscriptions",
   groups: "groups",
   groupMembers: "group_members",
+  friendRequests: "friend_requests",
+  friendships: "friendships",
   expenses: "expenses",
   balances: "balances",
   settlements: "settlements",

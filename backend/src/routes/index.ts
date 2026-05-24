@@ -1,5 +1,7 @@
 import { Router } from "express";
 import userRoutes from "../modules/user/user.routes";
+import usersRoutes from "../modules/users/users.routes";
+import friendRoutes from "../modules/friend/friend.routes";
 import groupRoutes from "../modules/group/group.routes";
 import expenseRoutes from "../modules/expense/expense.routes";
 import balanceRoutes from "../modules/balance/balance.routes";
@@ -11,6 +13,12 @@ const router = Router();
 
 // User / Me routes
 router.use("/me", userRoutes);
+
+// Users search
+router.use("/users", usersRoutes);
+
+// Friend routes
+router.use("/friends", friendRoutes);
 
 // Group routes
 router.use("/groups", groupRoutes);
