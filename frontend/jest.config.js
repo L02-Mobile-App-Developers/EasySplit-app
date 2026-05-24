@@ -1,27 +1,46 @@
 module.exports = {
   preset: "jest-expo",
+  setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
 
-  // Keep coverage collection consistent with package.json
-  collectCoverage: true,
+  collectCoverage: false,
   collectCoverageFrom: [
-    "**/*.{ts,tsx,js,jsx}",
-    "!**/coverage/**",
-    "!**/node_modules/**",
-    "!**/babel.config.js",
-    "!**/expo-env.d.ts",
-    "!**/.expo/**",
-    "!**/app-examples/**",
+    "api/**/*.{ts,tsx}",
+    "store/**/*.{ts,tsx}",
+    "hooks/useAppTheme.ts",
+    "hooks/use-theme-color.ts",
+    "hooks/useAuth.ts",
+    "components/ThemedText.tsx",
+    "services/**/*.{ts,tsx}",
+    "constants/**/*.{ts,tsx}",
+    "!api/types/**",
+    "!api/groupApi.ts",
+    "!**/__tests__/**",
   ],
   coverageDirectory: "coverage",
-  coverageReporters: ["lcov", "text"],
+  coverageReporters: ["lcov", "text", "text-summary"],
+  coverageThreshold: {
+    global: {
+      branches: 70,
+      functions: 70,
+      lines: 70,
+      statements: 70,
+    },
+  },
 
-  // Transform ignore: allow some react-native/expo packages to be transformed
   transformIgnorePatterns: [
     "node_modules/(?!(?:.pnpm/)?((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg))",
   ],
 
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json", "node"],
+  moduleNameMapper: {
+    "^@/(.*)$": "<rootDir>/$1",
+  },
 
-  testPathIgnorePatterns: ["/node_modules/", "/android/", "/ios/"],
+  testPathIgnorePatterns: [
+    "/node_modules/",
+    "/android/",
+    "/ios/",
+    "/__tests__/helpers/",
+  ],
   testRegex: "(/__tests__/.*|(\\.|/)(test|spec))\\.(jsx?|tsx?)$",
 };

@@ -274,7 +274,7 @@ npm test                              # unit tests
 npx jest --coverage --colors=never    # kèm coverage
 ```
 
-Coverage gần nhất (~80% statements): xem [`backend/coverage-report.md`](backend/coverage-report.md).
+Báo cáo coverage chi tiết: [`docs/test-coverage-report.md`](docs/test-coverage-report.md) · [backend](backend/coverage-report.md) · [frontend](frontend/coverage-report.md).
 
 Các suite chính: `auth`, `user`, `users`, `friend`, `group`, `expense`, `balance`, `settlement`, `reminder`, `activity`.
 
@@ -282,16 +282,28 @@ Các suite chính: `auth`, `user`, `users`, `friend`, `group`, `expense`, `balan
 
 ```bash
 cd frontend
-npm run testFinal        # chạy toàn bộ test một lần
+npm run testFinal        # chạy test (không coverage)
+npm run test:coverage    # test + coverage, ngưỡng tối thiểu 70%
 npm test                 # watch mode (changedSince origin/main)
-npm run updateSnapshots  # cập nhật snapshot
 ```
+
+**Loại test** (thư mục `frontend/__tests__/`):
+
+| Loại | Ví dụ |
+|------|--------|
+| Unit | API services, `token.storage`, `endpoints`, `client` interceptors |
+| Component | `ThemedText`, `LoadingScreen` |
+| Store | `auth.store` (Zustand) |
+| Hooks | `useAuth`, `useAppTheme`, `use-theme-color` |
+| Integration | Luồng login → `fetchMe` |
+
+Coverage tập trung vào logic nghiệp vụ (`api/`, `store/`, `hooks/`, `constants/`). Ngưỡng CI: **≥ 70%** statements/branches/functions/lines. Báo cáo: [`docs/test-coverage-report.md`](docs/test-coverage-report.md).
 
 ## CI/CD
 
 | Workflow                                                 | Trigger                        | Hành động                                                                     |
 | -------------------------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------- |
-| [frontend-test.yml](.github/workflows/frontend-test.yml) | Push/PR thay đổi `frontend/**` | Checkout → Node 20 → `npm install` → `npm run testFinal`                      |
+| [frontend-test.yml](.github/workflows/frontend-test.yml) | Push/PR thay đổi `frontend/**` | Checkout → Node 20 → `npm ci` → `npm run test:ci` (coverage ≥ 70%)            |
 | [backend-test.yml](.github/workflows/backend-test.yml)   | Push/PR thay đổi `backend/**`  | Checkout → Node 20 → `npm ci` → `npm run lint` → `npm test` → `npm run build` |
 
 ## Screenshots

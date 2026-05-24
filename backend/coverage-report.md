@@ -1,76 +1,63 @@
 # Báo cáo Test Coverage — Backend
 
-Ngày chạy: 2026-05-24
+**Ngày chạy:** 2026-05-24  
+**Lệnh:** `npx jest --coverage --colors=never tests/unit`  
+**Kết quả:** 13 suites passed · 83 tests passed
 
-Tóm tắt lần chạy gần nhất
+---
 
-- Test suites: 13 passed, 13 total
-- Tests: 83 passed
-- Command chạy: `npx jest --coverage --colors=never`
+## Tổng quan
 
-Tổng quan coverage
+| Chỉ số | Giá trị |
+|--------|--------|
+| Statements | **80.02%** |
+| Branches | **65.97%** |
+| Functions | **79.60%** |
+| Lines | **79.83%** |
 
-- Statements: **80.02%**
-- Branches: **65.97%**
-- Functions: **79.60%**
-- Lines: **79.83%**
+## Chi tiết theo module
 
-Chi tiết theo module (từ báo cáo jest):
+| Module | Stmts | Branch | Funcs | Lines | Uncovered (tóm tắt) |
+|--------|-------|--------|-------|-------|---------------------|
+| activity | 89.13% | 81.08% | 77.77% | 88.63% | 45, 77, 97, 107, 111 |
+| auth | 76.71% | 64.28% | 100% | 76.71% | 50, 99, 170, 213–248 |
+| balance | 72.22% | 100% | 60% | 76.47% | 17–28 |
+| expense | 87.20% | 70.32% | 84.61% | 87.57% | transaction, validation paths |
+| friend | 96.49% | 81.81% | 100% | 100% | branches 45–83 |
+| group | 76.72% | 60.00% | 85.71% | 76.72% | role/member edge cases |
+| reminder | 85.24% | 64.28% | 63.63% | 84.74% | 84–172 |
+| **settlement** | **66.84%** | **53.33%** | 70% | **66.10%** | smart settle, group settlement |
+| user | 78.12% | 60.00% | 71.42% | 78.12% | 23, 37, 50–57, 73, 104 |
+| users | 100% | 71.42% | 100% | 100% | branches 3, 11–12 |
 
-- activity: Statements 89.13% | Branches 81.08% | Lines 88.63%
-- auth: Statements 76.71% | Branches 64.28% | Lines 76.71%
-- balance: Statements 72.22% | Branches 100% | Lines 76.47%
-- expense: Statements 87.20% | Branches 70.32% | Lines 87.57%
-- friend: Statements 96.49% | Branches 81.81% | Lines 100%
-- group: Statements 76.72% | Branches 60.00% | Lines 76.72%
-- reminder: Statements 85.24% | Branches 64.28% | Lines 84.74%
-- settlement: Statements 66.84% | Branches 53.33% | Lines 66.10%
-- user: Statements 78.12% | Branches 60.00% | Lines 78.12%
-- users: Statements 100% | Branches 71.42% | Lines 100%
+## Test suites (`tests/unit/modules/`)
 
-Những khu vực chưa được cover (ưu tiên):
+| File test | Module |
+|-----------|--------|
+| `auth/auth.service.test.ts` | auth |
+| `user/user.service.test.ts` | user |
+| `users/users.service.test.ts` | users |
+| `friend/friend.service.test.ts` | friend |
+| `group/group.service.test.ts` | group |
+| `expense/expense.validation.test.ts` | expense |
+| `expense/expense.split.test.ts` | expense |
+| `expense/expense.transaction.test.ts` | expense |
+| `expense/expense.crud.test.ts` | expense |
+| `balance/balance.service.test.ts` | balance |
+| `settlement/settlement.service.test.ts` | settlement |
+| `reminder/reminder.service.test.ts` | reminder |
+| `activity/activity.service.test.ts` | activity |
 
-- `src/modules/settlement/settlement.service.ts`
-    - Nhiều dòng và nhánh chưa cover (xem báo cáo jest để biết range dòng chính xác). Đây là vùng có ảnh hưởng lớn nhất đến tổng Statements/Branches.
-- `src/modules/auth/auth.service.ts`
-    - Các nhánh liên quan tới token validation / DEV_AUTH_ENABLED / header override.
-- `src/modules/group/group.service.ts`
-    - Một số nhánh xung quanh role change, add/remove member edge-cases.
+## Ưu tiên cải thiện
 
-Hành động đã làm lần này
+1. **`settlement.service.ts`** — coverage thấp nhất; thêm test smart settle, commit, audit.
+2. **`group.service.ts`** — branches 60%; test đổi role / xóa member.
+3. **`auth.service.ts`** — Firebase token, `DEV_AUTH_ENABLED`.
 
-- Thêm file test: `tests/unit/modules/expense/expense.crud.test.ts` (CRUD flows create/get/update/delete được mock transaction), giúp đẩy coverage `expense` lên ~87% và tổng statements lên 80.02%.
-- Chạy `npx jest --coverage --colors=never` và lưu kết quả.
+## HTML report
 
-Khuyến nghị tiếp theo (để đạt coverage mục tiêu >= 75% statements và cải thiện branch coverage):
+Sau khi chạy coverage: mở `backend/coverage/lcov-report/index.html`
 
-1. Tập trung test `settlement.service.ts`:
-    - Thêm unit tests cho các nhánh của `generateSmartSettle` (nhiều kịch bản debts), `createSettlement` (validation error, audit log path, transaction failure), và các đường dẫn audit/write khác.
-2. Kiểm tra các nhánh ở `auth.service.ts`:
-    - Viết test cho: token hợp lệ, token không hợp lệ, `DEV_AUTH_ENABLED` true với header `X-User-Id`, và các lỗi trả về.
-3. Thêm một vài test cho `group.service.ts` để cover role changes và member edge-cases.
+## Báo cáo tổng hợp
 
-Gợi ý kỹ thuật cho viết test transaction-heavy (áp dụng lại pattern hiện tại):
-
-- Mock `@/lib/firestore-db` functions: `getDocInTransaction`, `getQueryInTransaction`, `collectionRef(...).firestore.runTransaction` để callback nhận đối tượng transaction có `set`, `delete`, `update` spy.
-- Dùng `mockResolvedValueOnce` theo đúng thứ tự các gọi để tránh tiêu thụ nhầm queue.
-- Khi assert lỗi, so sánh bằng `error.code` thay vì `instanceof` để tránh vấn đề class identity giữa module/test runtime.
-
-Lệnh tham khảo để chạy lại coverage local:
-
-```bash
-cd backend
-npx jest --coverage --colors=never
-```
-
-Muốn mình làm gì tiếp?
-
-- Mình có thể tiếp tục viết các test cho `settlement.service.ts` (mình sẽ tạo test file và chạy coverage), hoặc
-- Mình có thể tạo Pull Request với các thay đổi test hiện tại.
-
-File thay đổi / tạo:
-
-- [backend/tests/unit/modules/expense/expense.crud.test.ts](tests/unit/modules/expense/expense.crud.test.ts)
-- [backend/coverage-report.md](coverage-report.md)
-
--- Kết thúc báo cáo --
+Xem [docs/test-coverage-report.md](../docs/test-coverage-report.md) (Frontend + Backend).
