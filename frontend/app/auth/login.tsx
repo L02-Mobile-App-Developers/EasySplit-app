@@ -20,19 +20,6 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAuth } from "@/hooks/useAuth";
 import { Alert } from "react-native";
 
-const MOCK_USERS = [
-  {
-    name: "Nguyen Van A",
-    email: "demo@esplit.app",
-    password: "123456",
-  },
-  {
-    name: "Tran Thi B",
-    email: "user@esplit.app",
-    password: "abcdef",
-  },
-];
-
 export default function Login() {
   const { textColor, backgroundWhite, selected } = useAppTheme();
   const [email, setEmail] = useState("");
@@ -72,21 +59,6 @@ export default function Login() {
             <ThemedText style={[styles.subtitle, { color: placeholderGray }]}>
               Chào mừng bạn quay lại, hãy đăng nhập để tiếp tục.
             </ThemedText>
-
-            <View style={styles.mockBox}>
-              <ThemedText
-                fontWeight="semibold"
-                style={[styles.mockTitle, { color: textColor }]}
-              >
-                Tài khoản mẫu
-              </ThemedText>
-              <ThemedText style={[styles.mockText, { color: placeholderGray }]}>
-                demo@esplit.app / 123456
-              </ThemedText>
-              <ThemedText style={[styles.mockText, { color: placeholderGray }]}>
-                user@esplit.app / abcdef
-              </ThemedText>
-            </View>
 
             <TextInput
               value={email}

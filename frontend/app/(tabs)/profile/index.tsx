@@ -6,11 +6,14 @@ import {
   ActivityIndicator,
   Image,
   ScrollView,
-  TextInput,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+
+import { authService } from "@/api/services/auth.service";
+import { router } from "expo-router";
 
 type ProfileData = {
   name: string;
@@ -51,7 +54,7 @@ const ProfileScreen = () => {
   useEffect(() => {
     const loadProfile = async () => {
       setLoading(true);
-      const data = await fetchProfileData() as ProfileData;
+      const data = (await fetchProfileData()) as ProfileData;
       setProfile(data);
       setDraft(data);
       setLoading(false);
@@ -104,9 +107,13 @@ const ProfileScreen = () => {
     return (
       <View style={{ flex: 1, backgroundColor: "#F7F9FB" }}>
         <TopAppBar title="EasySplit" showBack={false} showSearch showSettings />
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <View
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        >
           <ActivityIndicator size="large" color="#16A34A" />
-          <Text style={{ marginTop: 12, color: "#6B7280", fontSize: 14 }}>Đang tải hồ sơ...</Text>
+          <Text style={{ marginTop: 12, color: "#6B7280", fontSize: 14 }}>
+            Đang tải hồ sơ...
+          </Text>
         </View>
       </View>
     );
@@ -116,7 +123,9 @@ const ProfileScreen = () => {
     return (
       <View style={{ flex: 1, backgroundColor: "#F7F9FB" }}>
         <TopAppBar title="EasySplit" showBack={false} showSearch showSettings />
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <View
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        >
           <Text style={{ color: "#6B7280" }}>Không thể tải dữ liệu</Text>
         </View>
       </View>
@@ -129,9 +138,15 @@ const ProfileScreen = () => {
 
       <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
         {/* Profile Information Section */}
-        <View style={{ alignItems: "center", paddingTop: 32, paddingBottom: 28 }}>
+        <View
+          style={{ alignItems: "center", paddingTop: 32, paddingBottom: 28 }}
+        >
           {/* Avatar with Edit Badge */}
-          <TouchableOpacity activeOpacity={0.85} onPress={isEditing ? handlePickAvatar : beginEditing} style={{ position: "relative", marginBottom: 16 }}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={isEditing ? handlePickAvatar : beginEditing}
+            style={{ position: "relative", marginBottom: 16 }}
+          >
             <Image
               source={draft?.avatar || profile.avatar}
               style={{
@@ -157,7 +172,11 @@ const ProfileScreen = () => {
                 alignItems: "center",
               }}
             >
-              <MaterialIcons name={isEditing ? "photo-library" : "edit"} size={20} color="#fff" />
+              <MaterialIcons
+                name={isEditing ? "photo-library" : "edit"}
+                size={20}
+                color="#fff"
+              />
             </View>
           </TouchableOpacity>
 
@@ -172,49 +191,119 @@ const ProfileScreen = () => {
             <View style={{ width: "100%", paddingHorizontal: 20, gap: 10 }}>
               <TextInput
                 value={draft?.name ?? ""}
-                onChangeText={(value) => setDraft((current) => (current ? { ...current, name: value } : current))}
+                onChangeText={(value) =>
+                  setDraft((current) =>
+                    current ? { ...current, name: value } : current,
+                  )
+                }
                 placeholder="Họ và tên"
                 placeholderTextColor="#9CA3AF"
-                style={{ backgroundColor: "#fff", borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, color: "#0F172A" }}
+                style={{
+                  backgroundColor: "#fff",
+                  borderWidth: 1,
+                  borderColor: "#E5E7EB",
+                  borderRadius: 14,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  fontSize: 16,
+                  color: "#0F172A",
+                }}
               />
               <TextInput
                 value={draft?.email ?? ""}
-                onChangeText={(value) => setDraft((current) => (current ? { ...current, email: value } : current))}
+                onChangeText={(value) =>
+                  setDraft((current) =>
+                    current ? { ...current, email: value } : current,
+                  )
+                }
                 placeholder="Email"
                 placeholderTextColor="#9CA3AF"
                 keyboardType="email-address"
                 autoCapitalize="none"
-                style={{ backgroundColor: "#fff", borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, color: "#0F172A" }}
+                style={{
+                  backgroundColor: "#fff",
+                  borderWidth: 1,
+                  borderColor: "#E5E7EB",
+                  borderRadius: 14,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  fontSize: 16,
+                  color: "#0F172A",
+                }}
               />
               <TextInput
                 value={draft?.phone ?? ""}
-                onChangeText={(value) => setDraft((current) => (current ? { ...current, phone: value } : current))}
+                onChangeText={(value) =>
+                  setDraft((current) =>
+                    current ? { ...current, phone: value } : current,
+                  )
+                }
                 placeholder="Số điện thoại"
                 placeholderTextColor="#9CA3AF"
                 keyboardType="phone-pad"
-                style={{ backgroundColor: "#fff", borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, color: "#0F172A" }}
+                style={{
+                  backgroundColor: "#fff",
+                  borderWidth: 1,
+                  borderColor: "#E5E7EB",
+                  borderRadius: 14,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  fontSize: 16,
+                  color: "#0F172A",
+                }}
               />
 
               <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
                 <TouchableOpacity
                   activeOpacity={0.85}
                   onPress={cancelEditing}
-                  style={{ flex: 1, backgroundColor: "#F3F4F6", borderRadius: 14, paddingVertical: 13, alignItems: "center" }}
+                  style={{
+                    flex: 1,
+                    backgroundColor: "#F3F4F6",
+                    borderRadius: 14,
+                    paddingVertical: 13,
+                    alignItems: "center",
+                  }}
                 >
-                  <Text style={{ fontSize: 15, fontWeight: "700", color: "#374151" }}>Hủy</Text>
+                  <Text
+                    style={{
+                      fontSize: 15,
+                      fontWeight: "700",
+                      color: "#374151",
+                    }}
+                  >
+                    Hủy
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   activeOpacity={0.85}
                   onPress={handleSaveProfile}
-                  style={{ flex: 1, backgroundColor: "#16A34A", borderRadius: 14, paddingVertical: 13, alignItems: "center" }}
+                  style={{
+                    flex: 1,
+                    backgroundColor: "#16A34A",
+                    borderRadius: 14,
+                    paddingVertical: 13,
+                    alignItems: "center",
+                  }}
                 >
-                  <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>Lưu hồ sơ</Text>
+                  <Text
+                    style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}
+                  >
+                    Lưu hồ sơ
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
           ) : (
             <>
-              <Text style={{ fontSize: 24, fontWeight: "700", color: "#0F172A", marginBottom: 6 }}>
+              <Text
+                style={{
+                  fontSize: 24,
+                  fontWeight: "700",
+                  color: "#0F172A",
+                  marginBottom: 6,
+                }}
+              >
                 {profile.name}
               </Text>
               <Text style={{ fontSize: 14, color: "#6B7280", marginBottom: 4 }}>
@@ -247,10 +336,24 @@ const ProfileScreen = () => {
               alignItems: "center",
             }}
           >
-            <Text style={{ fontSize: 28, fontWeight: "700", color: "#16A34A", marginBottom: 6 }}>
+            <Text
+              style={{
+                fontSize: 28,
+                fontWeight: "700",
+                color: "#16A34A",
+                marginBottom: 6,
+              }}
+            >
               {profile.groups}
             </Text>
-            <Text style={{ fontSize: 11, fontWeight: "700", color: "#6B7280", letterSpacing: 0.5 }}>
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: "700",
+                color: "#6B7280",
+                letterSpacing: 0.5,
+              }}
+            >
               SỐ NHÓM
             </Text>
           </View>
@@ -266,10 +369,24 @@ const ProfileScreen = () => {
               alignItems: "center",
             }}
           >
-            <Text style={{ fontSize: 28, fontWeight: "700", color: "#16A34A", marginBottom: 6 }}>
+            <Text
+              style={{
+                fontSize: 28,
+                fontWeight: "700",
+                color: "#16A34A",
+                marginBottom: 6,
+              }}
+            >
               {profile.friends}
             </Text>
-            <Text style={{ fontSize: 11, fontWeight: "700", color: "#6B7280", letterSpacing: 0.5 }}>
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: "700",
+                color: "#6B7280",
+                letterSpacing: 0.5,
+              }}
+            >
               SỐ BẠN BÈ
             </Text>
           </View>
@@ -285,10 +402,24 @@ const ProfileScreen = () => {
               alignItems: "center",
             }}
           >
-            <Text style={{ fontSize: 28, fontWeight: "700", color: "#16A34A", marginBottom: 6 }}>
+            <Text
+              style={{
+                fontSize: 28,
+                fontWeight: "700",
+                color: "#16A34A",
+                marginBottom: 6,
+              }}
+            >
               {profile.transactions}
             </Text>
-            <Text style={{ fontSize: 11, fontWeight: "700", color: "#6B7280", letterSpacing: 0.5 }}>
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: "700",
+                color: "#6B7280",
+                letterSpacing: 0.5,
+              }}
+            >
               GIAO DỊCH
             </Text>
           </View>
@@ -332,9 +463,20 @@ const ProfileScreen = () => {
                 marginRight: 12,
               }}
             >
-              <MaterialCommunityIcons name="account-edit" size={22} color="#0F172A" />
+              <MaterialCommunityIcons
+                name="account-edit"
+                size={22}
+                color="#0F172A"
+              />
             </View>
-            <Text style={{ flex: 1, fontSize: 16, fontWeight: "500", color: "#0F172A" }}>
+            <Text
+              style={{
+                flex: 1,
+                fontSize: 16,
+                fontWeight: "500",
+                color: "#0F172A",
+              }}
+            >
               Chỉnh sửa hồ sơ
             </Text>
             <MaterialIcons name="chevron-right" size={24} color="#6B7280" />
@@ -364,7 +506,14 @@ const ProfileScreen = () => {
             >
               <MaterialCommunityIcons name="cog" size={22} color="#0F172A" />
             </View>
-            <Text style={{ flex: 1, fontSize: 16, fontWeight: "500", color: "#0F172A" }}>
+            <Text
+              style={{
+                flex: 1,
+                fontSize: 16,
+                fontWeight: "500",
+                color: "#0F172A",
+              }}
+            >
               Cài đặt
             </Text>
             <MaterialIcons name="chevron-right" size={24} color="#6B7280" />
@@ -390,9 +539,20 @@ const ProfileScreen = () => {
                 marginRight: 12,
               }}
             >
-              <MaterialCommunityIcons name="help-circle" size={22} color="#0F172A" />
+              <MaterialCommunityIcons
+                name="help-circle"
+                size={22}
+                color="#0F172A"
+              />
             </View>
-            <Text style={{ flex: 1, fontSize: 16, fontWeight: "500", color: "#0F172A" }}>
+            <Text
+              style={{
+                flex: 1,
+                fontSize: 16,
+                fontWeight: "500",
+                color: "#0F172A",
+              }}
+            >
               Hỗ trợ
             </Text>
             <MaterialIcons name="chevron-right" size={24} color="#6B7280" />
@@ -410,6 +570,10 @@ const ProfileScreen = () => {
             flexDirection: "row",
             alignItems: "center",
             marginBottom: 32,
+          }}
+          onPress={() => {
+            authService.logout();
+            router.replace("/auth/login");
           }}
         >
           <View
@@ -432,14 +596,42 @@ const ProfileScreen = () => {
 
         {/* Footer Info */}
         <View style={{ alignItems: "center", paddingBottom: 16 }}>
-          <Text style={{ fontSize: 10, fontWeight: "700", color: "#9CA3AF", letterSpacing: 2 }}>
+          <Text
+            style={{
+              fontSize: 10,
+              fontWeight: "700",
+              color: "#9CA3AF",
+              letterSpacing: 2,
+            }}
+          >
             EASYSPLIT V2.4.0
           </Text>
           {/* Pagination Dots */}
           <View style={{ flexDirection: "row", gap: 6, marginTop: 8 }}>
-            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#16A34A" }} />
-            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#D1D5DB" }} />
-            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#D1D5DB" }} />
+            <View
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: "#16A34A",
+              }}
+            />
+            <View
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: "#D1D5DB",
+              }}
+            />
+            <View
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: "#D1D5DB",
+              }}
+            />
           </View>
         </View>
       </ScrollView>

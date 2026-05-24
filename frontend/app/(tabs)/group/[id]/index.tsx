@@ -3,37 +3,50 @@ import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
-// import { activityService } from "@/api/services/activity.service";
+import { expenseService } from "@/api/services/expense.service";
+import { groupService } from "@/api/services/group.service";
+import { settlementService } from "@/api/services/settlement.service";
+
+import { balanceService } from "@/api/services/balance.service";
+import { Balance } from "@/api/types/balance";
+import { Expense } from "@/api/types/expense";
+import { Group, GroupMember } from "@/api/types/group";
+import { useEffect, useState } from "react";
+
+import { DebtEdge } from "@/api/types/settlement";
+import { useAuthStore } from "@/store/auth.store";
+
+const user = useAuthStore.getState().user;
 
 // user to repay debt
-const user = [
-  {
-    id: "user-1",
-    name: "Nguyen Van A",
-    avatar: "https://randomuser.me/api/portraits/men/1.jpg",
-    amount: -500000,
-  },
-  {
-    id: "user-2",
-    name: "Nguyen Van B",
-    avatar: "https://randomuser.me/api/portraits/men/2.jpg",
-    amount: 300000,
-  },
-  {
-    id: "user-3",
-    name: "Nguyen Van C",
-    avatar: "https://randomuser.me/api/portraits/men/3.jpg",
-    amount: 200000,
-  },
-];
+// const user = [
+//   {
+//     id: "user-1",
+//     name: "Nguyen Van A",
+//     avatar: "https://randomuser.me/api/portraits/men/1.jpg",
+//     amount: -500000,
+//   },
+//   {
+//     id: "user-2",
+//     name: "Nguyen Van B",
+//     avatar: "https://randomuser.me/api/portraits/men/2.jpg",
+//     amount: 300000,
+//   },
+//   {
+//     id: "user-3",
+//     name: "Nguyen Van C",
+//     avatar: "https://randomuser.me/api/portraits/men/3.jpg",
+//     amount: 200000,
+//   },
+// ];
 
 // filter user to repay debt
-const userToPay = user
-  .filter((u) => u.amount < 0)
-  .map((u) => ({
-    ...u,
-    amount: Math.abs(u.amount),
-  }));
+// const userToPay = user
+//   .filter((u) => u.amount < 0)
+//   .map((u) => ({
+//     ...u,
+//     amount: Math.abs(u.amount),
+//   }));
 
 // recent activity
 const recentActivity = [
@@ -89,43 +102,72 @@ const groupedActivity = recentActivity.reduce(
 );
 
 export default function GroupDetail() {
-  const { groupId } = useLocalSearchParams();
+  const { id } = useLocalSearchParams();
 
-  //
-  //   const loadActivities = async () => {
-  //   try {
-  //     const response =
-  //       await activityService.getActivities(
-  //         groupId,
-  //         {
-  //           page: 1,
-  //           limit: 20,
-  //         },
-  //       );
+  const [group, setGroup] = useState<Group>();
+  const [members, setMembers] = useState<GroupMember[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [mybalances, setBalances] = useState<Balance>();
 
-  //     console.log(response.items);
-  //   } catch (error) {
-  //     console.log(error);
-  //   }
-  // };
+  const [memberToPay, setMemberToPay] = useState<DebtEdge[]>([]);
 
-  // const loadHistory = async () => {
-  //   try {
-  //     const response =
-  //       await activityService.getHistory(
-  //         groupId,
-  //         {
-  //           page: 1,
-  //           limit: 20,
-  //           type: "expense",
-  //         },
-  //       );
+  useEffect(() => {
+    const fetchGroup = async () => {
+      try {
+        const data = await groupService.getGroup(id as string);
+        setGroup(data);
+      } catch (error) {
+        console.error("Failed to fetch group details:", error);
+      }
+    };
 
-  //     console.log(response.items);
-  //   } catch (error) {
-  //     console.log(error);
-  //   }
-  // };
+    const fetchMembers = async () => {
+      try {
+        const data = await groupService.getGroupMembers(id as string);
+        setMembers(data);
+      } catch (error) {
+        console.error("Failed to fetch group members:", error);
+      }
+    };
+
+    const fetchExpenses = async () => {
+      try {
+        const { items } = await expenseService.getExpenses(id as string);
+        setExpenses(items);
+      } catch (error) {
+        console.error("Failed to fetch group expenses:", error);
+      }
+    };
+
+    const fetchBalances = async () => {
+      try {
+        const data = await balanceService.getMyBalance(id as string);
+        setBalances(data);
+      } catch (error) {
+        console.error("Failed to fetch my balances:", error);
+      }
+    };
+
+    const fetchSettlements = async () => {
+      try {
+        const items = await settlementService.getDebts(id as string);
+        items.forEach((item) => {
+          if (item.fromUser?.id === user?.id) {
+            // bạn là người trả nợ
+            setMemberToPay((prev) => [...prev, item]);
+          }
+        });
+      } catch (error) {
+        console.error("Failed to fetch settlements:", error);
+      }
+    };
+
+    fetchGroup();
+    fetchMembers();
+    fetchExpenses();
+    fetchBalances();
+    fetchSettlements();
+  }, [id]);
 
   return (
     <View style={{ flex: 1, backgroundColor: "#F7F9FB" }}>
@@ -175,10 +217,12 @@ export default function GroupDetail() {
             {/* TEXT */}
             <View style={{ alignItems: "flex-start" }}>
               <Text style={{ fontSize: 23, fontWeight: "bold" }}>
-                Du lịch Đà Lạt
+                {group?.name || "Đang tải..."}
               </Text>
               <Text style={{ color: "gray", fontSize: 16 }}>
-                Nhóm du lịch - 10 thành viên
+                {group?.memberCount
+                  ? `${group.memberCount} thành viên`
+                  : "Đang tải..."}
               </Text>
             </View>
           </View>
@@ -229,7 +273,9 @@ export default function GroupDetail() {
                   color: "white",
                 }}
               >
-                +5.000đ
+                {mybalances
+                  ? `${mybalances.balance >= 0 ? "+" : ""}${mybalances.balance}đ`
+                  : "Đang tải..."}
               </Text>
             </View>
           </View>
@@ -254,7 +300,7 @@ export default function GroupDetail() {
               paddingHorizontal: 12,
               borderRadius: 10,
             }}
-            onPress={() => router.push(`/group/${groupId}/add-expense`)}
+            onPress={() => router.push(`/group/${id}/add-expense`)}
           >
             <MaterialIcons name="add-circle-outline" size={24} color="white" />
             <Text style={{ fontSize: 16, color: "white" }}>Thêm khoản chi</Text>
@@ -291,14 +337,13 @@ export default function GroupDetail() {
         >
           <Text style={{ fontSize: 18, fontWeight: "bold" }}>Trả nợ</Text>
         </View>
-        {userToPay.map((user) => (
+        {memberToPay.map((user) => (
           <View
-            key={user.id}
+            key={user.toUserId}
             style={{
               width: "95%",
               flexDirection: "row",
               alignItems: "center",
-              // gap: 12,
               backgroundColor: "#fba8a8ff",
               padding: 12,
               borderRadius: 10,
@@ -315,7 +360,9 @@ export default function GroupDetail() {
             >
               <Image
                 source={{
-                  uri: user.avatar,
+                  uri:
+                    user.toUser?.avatarUrl ||
+                    "https://randomuser.me/api/portraits/men/1.jpg",
                 }}
                 style={{
                   width: 60,
@@ -324,8 +371,8 @@ export default function GroupDetail() {
                 }}
               />
               <View style={{ flexDirection: "column" }}>
-                <Text>{user.name}</Text>
-                <Text>{user.amount}</Text>
+                <Text>{user.toUser?.displayName}</Text>
+                <Text>{user.amount}đ</Text>
               </View>
             </View>
 
@@ -368,9 +415,8 @@ export default function GroupDetail() {
         </View>
 
         {/* Specific activity items */}
-        {Object.entries(groupedActivity).map(([group, items]) => (
+        {/* {Object.entries(groupedActivity).map(([group, items]) => (
           <View key={group} style={{ width: "95%" }}>
-            {/* HEADER GROUP */}
             <Text
               style={{
                 fontSize: 16,
@@ -383,12 +429,11 @@ export default function GroupDetail() {
               {group}
             </Text>
 
-            {/* ITEMS */}
             {items.map((activity) => (
               <TouchableOpacity
                 key={activity.id}
                 onPress={() =>
-                  router.push(`/group/${groupId}/expense/${activity.id}`)
+                  router.push(`/group/${id}/expense/${activity.id}`)
                 }
                 style={{
                   flexDirection: "row",
@@ -436,6 +481,64 @@ export default function GroupDetail() {
               </TouchableOpacity>
             ))}
           </View>
+        ))} */}
+        {expenses.map((expense) => (
+          <TouchableOpacity
+            style={{
+              width: "95%",
+            }}
+            key={expense.id}
+            onPress={() => router.push(`/group/${id}/expense/${expense.id}`)}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                backgroundColor: "#fff",
+                padding: 12,
+                borderRadius: 10,
+                marginBottom: 10,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  gap: 12,
+                  alignItems: "center",
+                }}
+              >
+                <Image
+                  source={{
+                    uri: "https://randomuser.me/api/portraits/men/1.jpg",
+                  }}
+                  style={{ width: 50, height: 50, borderRadius: 20 }}
+                />
+
+                <View>
+                  <Text>{expense.description}</Text>
+                  <Text style={{ color: "gray", fontSize: 12 }}>
+                    {expense.payer?.displayName} -{" "}
+                    {expense.participants?.length} người
+                  </Text>
+                </View>
+              </View>
+
+              <View
+                style={{ alignItems: "flex-end", justifyContent: "center" }}
+              >
+                <Text style={{ fontWeight: "bold" }}>{expense.amount}đ</Text>
+                {/* <Text
+                  style={{
+                    color: expense.amount >= 0 ? "green" : "red",
+                  }}
+                >
+                  {expense.amount >= 0
+                    ? `+${expense.amount}đ`
+                    : `${expense.amount}đ`}
+                </Text> */}
+              </View>
+            </View>
+          </TouchableOpacity>
         ))}
 
         {/* Member */}
@@ -462,9 +565,9 @@ export default function GroupDetail() {
             gap: 12,
           }}
         >
-          {user.map((member) => (
+          {members.map((member) => (
             <View
-              key={member.id}
+              key={member.userId}
               style={{
                 width: "48%",
                 flexDirection: "column",
@@ -478,7 +581,9 @@ export default function GroupDetail() {
             >
               <Image
                 source={{
-                  uri: member.avatar,
+                  uri:
+                    member.avatarUrl ||
+                    "https://randomuser.me/api/portraits/men/1.jpg",
                 }}
                 style={{
                   width: 60,
@@ -487,12 +592,12 @@ export default function GroupDetail() {
                 }}
               />
               <View style={{ flexDirection: "column", alignItems: "center" }}>
-                <Text style={{ fontWeight: "bold" }}>{member.name}</Text>
-                <Text style={{ color: member.amount >= 0 ? "green" : "red" }}>
+                <Text style={{ fontWeight: "bold" }}>{member.displayName}</Text>
+                {/* <Text style={{ color: member.amount >= 0 ? "green" : "red" }}>
                   {member.amount >= 0
                     ? `+${member.amount}đ`
                     : `${member.amount}đ`}
-                </Text>
+                </Text> */}
               </View>
             </View>
           ))}
