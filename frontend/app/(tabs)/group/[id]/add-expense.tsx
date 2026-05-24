@@ -17,28 +17,8 @@ import {
 import { groupService } from "@/api/services/group.service";
 import { GroupMember } from "@/api/types/group";
 
-const participants = [
-  {
-    id: 1,
-    name: "BẠN",
-    avatar: "https://randomuser.me/api/portraits/men/1.jpg",
-  },
-  {
-    id: 2,
-    name: "MAI",
-    avatar: "https://randomuser.me/api/portraits/women/2.jpg",
-  },
-  {
-    id: 3,
-    name: "NAM",
-    avatar: "https://randomuser.me/api/portraits/men/3.jpg",
-  },
-  {
-    id: 4,
-    name: "VY",
-    avatar: "https://randomuser.me/api/portraits/women/4.jpg",
-  },
-];
+import { expenseService } from "@/api/services/expense.service";
+import { CreateExpenseRequest, SplitMode } from "@/api/types/expense";
 
 const splitModes = ["CHIA ĐỀU", "SỐ TIỀN", "%"] as const;
 
@@ -49,16 +29,16 @@ export default function AddExpenseScreen() {
 
   const [expenseName, setExpenseName] = useState("");
   const [amount, setAmount] = useState("");
-  const [payer, setPayer] = useState("Bạn (Khoa)");
+  const [payer, setPayer] = useState("");
   const [showPayerModal, setShowPayerModal] = useState(false);
 
-  const [memberName, setMemberName] = useState<GroupMember[]>();
+  const [members, setMembers] = useState<GroupMember[]>([]);
 
   const [splitMode, setSplitMode] =
     useState<(typeof splitModes)[number]>("CHIA ĐỀU");
   const [selectedParticipantIds, setSelectedParticipantIds] = useState<
-    number[]
-  >(participants.map((item) => item.id));
+    string[]
+  >([]);
 
   const parsedAmount = Number(amount.replace(/[^0-9]/g, "")) || 0;
   const selectedCount = selectedParticipantIds.length || 1;
@@ -70,7 +50,7 @@ export default function AddExpenseScreen() {
 
   const formatCurrency = (value: number) => `${value.toLocaleString("vi-VN")}đ`;
 
-  const toggleParticipant = (participantId: number) => {
+  const toggleParticipant = (participantId: string) => {
     setSelectedParticipantIds((current) =>
       current.includes(participantId)
         ? current.filter((idValue) => idValue !== participantId)
@@ -78,31 +58,89 @@ export default function AddExpenseScreen() {
     );
   };
 
-  const handleSave = () => {
-    if (!expenseName.trim()) {
-      Alert.alert("Thiếu thông tin", "Vui lòng nhập tên khoản chi.");
-      return;
-    }
+  const handleSave = async () => {
+    try {
+      if (!expenseName.trim()) {
+        Alert.alert("Thiếu thông tin", "Vui lòng nhập tên khoản chi.");
+        return;
+      }
 
-    if (!parsedAmount) {
-      Alert.alert("Thiếu thông tin", "Vui lòng nhập số tiền hợp lệ.");
-      return;
-    }
+      if (!parsedAmount) {
+        Alert.alert("Thiếu thông tin", "Vui lòng nhập số tiền hợp lệ.");
+        return;
+      }
 
-    Alert.alert(
-      "Đã lưu",
-      `Khoản chi ${expenseName} cho nhóm ${String(id)} đã được tạo thử nghiệm.`,
-      [{ text: "OK", onPress: () => router.back() }],
-    );
+      if (!payer) {
+        Alert.alert("Thiếu thông tin", "Vui lòng chọn người trả.");
+        return;
+      }
+
+      if (selectedParticipantIds.length === 0) {
+        Alert.alert(
+          "Thiếu thông tin",
+          "Vui lòng chọn ít nhất 1 người tham gia.",
+        );
+        return;
+      }
+
+      let splitModeValue: SplitMode = "equal";
+
+      switch (splitMode) {
+        case "CHIA ĐỀU":
+          splitModeValue = "equal";
+          break;
+
+        case "SỐ TIỀN":
+          splitModeValue = "amount";
+          break;
+
+        case "%":
+          splitModeValue = "percent";
+          break;
+      }
+
+      const participants = selectedParticipantIds.map((userId) => ({
+        userId,
+        value: splitModeValue === "equal" ? perPersonAmount : perPersonAmount,
+      }));
+
+      const payload: CreateExpenseRequest = {
+        description: expenseName,
+        amount: parsedAmount,
+        currency: "VND",
+        paidByUserId:
+          members.find((m) => m.displayName === payer)?.userId || "",
+        splitMode: splitModeValue,
+        participants,
+      };
+
+      await expenseService.createExpense(String(id), payload);
+
+      Alert.alert("Thành công", "Tạo khoản chi thành công.", [
+        {
+          text: "OK",
+          onPress: () => router.back(),
+        },
+      ]);
+    } catch (error) {
+      console.error("Create expense error:", error);
+
+      Alert.alert("Lỗi", "Không thể tạo khoản chi.");
+    }
   };
 
   useEffect(() => {
-    // Fetch group members to get the name of the payer
     const fetchGroupMembers = async () => {
       try {
-        const members = await groupService.getGroupMembers(String(id));
+        const response = await groupService.getGroupMembers(String(id));
 
-        setMemberName(members);
+        setMembers(response);
+
+        setSelectedParticipantIds(response.map((member) => member.userId));
+
+        if (response.length > 0) {
+          setPayer(response[0].displayName);
+        }
       } catch (error) {
         console.error("Error fetching group members:", error);
       }
@@ -272,11 +310,11 @@ export default function AddExpenseScreen() {
                     Chọn người trả
                   </Text>
                   <ScrollView>
-                    {participants.map((p) => (
+                    {members.map((member) => (
                       <Pressable
-                        key={p.id}
+                        key={member.userId}
                         onPress={() => {
-                          setPayer(`${p.name}`);
+                          setPayer(member.displayName);
                           setShowPayerModal(false);
                         }}
                         style={{
@@ -287,11 +325,15 @@ export default function AddExpenseScreen() {
                         }}
                       >
                         <Image
-                          source={{ uri: p.avatar }}
+                          source={{
+                            uri:
+                              member.avatarUrl ||
+                              "https://ui-avatars.com/api/?name=User",
+                          }}
                           style={{ width: 36, height: 36, borderRadius: 999 }}
                         />
                         <Text style={{ fontSize: 16, color: textColor }}>
-                          {p.name}
+                          {member.displayName}
                         </Text>
                       </Pressable>
                     ))}
@@ -341,14 +383,14 @@ export default function AddExpenseScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ gap: 10, paddingRight: 8 }}
             >
-              {participants.map((participant) => {
+              {members.map((participant) => {
                 const isSelected = selectedParticipantIds.includes(
-                  participant.id,
+                  participant.userId,
                 );
                 return (
                   <Pressable
-                    key={participant.id}
-                    onPress={() => toggleParticipant(participant.id)}
+                    key={participant.userId}
+                    onPress={() => toggleParticipant(participant.userId)}
                     style={{ alignItems: "center" }}
                   >
                     <View
@@ -363,7 +405,11 @@ export default function AddExpenseScreen() {
                       }}
                     >
                       <Image
-                        source={{ uri: participant.avatar }}
+                        source={{
+                          uri:
+                            participant.avatarUrl ||
+                            "https://ui-avatars.com/api/?name=User",
+                        }}
                         style={{
                           width: "100%",
                           height: "100%",
@@ -396,7 +442,7 @@ export default function AddExpenseScreen() {
                         color: textColor,
                       }}
                     >
-                      {participant.name}
+                      {participant.displayName}
                     </Text>
                   </Pressable>
                 );
