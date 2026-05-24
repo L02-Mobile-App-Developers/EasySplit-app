@@ -30,7 +30,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const userId = req.user!.userId;
-      const requestId = req.params.id;
+      const requestId = req.params.id as string;
       const result = await friendService.acceptFriendRequest(userId, requestId);
       sendSuccess(res, result, "Friend request accepted");
     } catch (err) {
@@ -73,7 +73,7 @@ router.delete(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const userId = req.user!.userId;
-      const requestId = req.params.id;
+      const requestId = req.params.id as string;
       const result = await friendService.rejectOrCancelFriendRequest(userId, requestId);
       sendSuccess(res, result, "Friend request cancelled/rejected");
     } catch (err) {

@@ -284,13 +284,10 @@ npm run updateSnapshots  # cập nhật snapshot
 
 ## CI/CD
 
-Workflow hiện có: [`.github/workflows/frontend-test.yml`](.github/workflows/frontend-test.yml)
-
-| Trigger | Hành động |
-|---------|-----------|
-| Push/PR thay đổi `frontend/**` | Checkout → Node 20 → `npm install` → `npm run testFinal` |
-
-Backend CI chưa được cấu hình trong repo; khuyến nghị bổ sung workflow chạy `npm test` và `npm run lint` trong `backend/`.
+| Workflow | Trigger | Hành động |
+|----------|---------|-----------|
+| [frontend-test.yml](.github/workflows/frontend-test.yml) | Push/PR thay đổi `frontend/**` | Checkout → Node 20 → `npm install` → `npm run testFinal` |
+| [backend-test.yml](.github/workflows/backend-test.yml) | Push/PR thay đổi `backend/**` | Checkout → Node 20 → `npm ci` → `npm run lint` → `npm test` → `npm run build` |
 
 ## Screenshots
 
