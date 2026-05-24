@@ -1,23 +1,70 @@
 import * as NavigationBar from "expo-navigation-bar";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
-import { Platform } from "react-native";
+import { useEffect, useState } from "react";
+import { Platform, Text, TextInput } from "react-native";
 
-import { Inter_900Black, useFonts } from "@expo-google-fonts/inter";
-import * as SplashScreen from "expo-splash-screen";
+import LoadingScreen from "@/services/LoadingScreen";
 
-SplashScreen.preventAutoHideAsync();
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+  Inter_800ExtraBold,
+  Inter_900Black,
+  useFonts,
+} from "@expo-google-fonts/inter";
+
+// import * as SplashScreen from "expo-splash-screen";
+
+// SplashScreen.preventAutoHideAsync();
+
+Text.defaultProps = Text.defaultProps ?? {};
+Text.defaultProps.style = [
+  Text.defaultProps.style,
+  { fontFamily: "Inter_400Regular" },
+];
+
+TextInput.defaultProps = TextInput.defaultProps ?? {};
+TextInput.defaultProps.style = [
+  TextInput.defaultProps.style,
+  { fontFamily: "Inter_400Regular" },
+];
 
 export default function RootLayout() {
+  const [appReady, setAppReady] = useState(false);
+
   const [loaded, error] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    Inter_800ExtraBold,
     Inter_900Black,
   });
 
   useEffect(() => {
-    if (loaded || error) {
-      SplashScreen.hideAsync();
+    async function prepare() {
+      if (!loaded && !error) return;
+
+      try {
+        // load api
+        // load token
+        // load async storage
+        // fetch user
+        // ...
+
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      } catch (e) {
+        console.log(e);
+      } finally {
+        setAppReady(true);
+        // await SplashScreen.hideAsync();
+      }
     }
+
+    prepare();
   }, [loaded, error]);
 
   useEffect(() => {
@@ -26,21 +73,14 @@ export default function RootLayout() {
     }
   }, []);
 
-  if (!loaded && !error) return null;
-
-  // giả lập check login
-  const isLoggedIn = true;
+  if (!appReady) {
+    return <LoadingScreen />;
+  }
 
   return (
     <>
       <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false }}>
-        {isLoggedIn ? (
-          <Stack.Screen name="(tabs)" />
-        ) : (
-          <Stack.Screen name="auth" />
-        )}
-      </Stack>
+      <Stack screenOptions={{ headerShown: false }} />
     </>
   );
 }

@@ -5,8 +5,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Index() {
   const [assets, error] = useAssets([
-    require("@/assets/images/icon.png"),
-    require("@/assets/images/icon.png"),
+    require("../assets/images/icon.png"),
+    require("../assets/images/icon.png"),
   ]);
 
   if (!assets) return null;

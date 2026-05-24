@@ -1,7 +1,9 @@
+import TopAppBar from "@/components/TopAppBar";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { AntDesign, EvilIcons, FontAwesome6 } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   ScrollView,
   Text,
@@ -12,21 +14,25 @@ import {
 
 import { router } from "expo-router";
 
+import { groupService } from "@/api/services/group.service";
+
+import type { Group } from "@/api/types/group";
+
 const status = [
-  { id: 1, name: "Tất cả" },
-  { id: 2, name: "Đang hoạt động" },
-  { id: 3, name: "Đã quyết toán" },
+  { id: 10, name: "Tất cả" },
+  { id: 20, name: "Đang hoạt động" },
+  { id: 30, name: "Đã quyết toán" },
 ];
 
 const groupList = [
   {
     id: 1,
-    avt: require("@/assets/images/icon.png"),
+    avt: require("../../../assets/images/icon.png"),
     name: "Du lịch Đà lạt",
     members: 4,
     type: "Du lịch",
     settled: false, // đã quyết toán chưa
-    icon: require("@/assets/images/icon.png"),
+    icon: require("../../../assets/images/icon.png"),
     money: 50000, // số tiền mình nợ (âm) hoặc được hoàn (dương)
     recentActivity: {
       description: "A đã thanh toán cho Trà sữa",
@@ -35,12 +41,12 @@ const groupList = [
   },
   {
     id: 2,
-    avt: require("@/assets/images/icon.png"),
+    avt: require("../../../assets/images/icon.png"),
     name: "Du lịch Vũng tàu",
     members: 4,
     type: "Du lịch",
     settled: false, // đã quyết toán chưa
-    icon: require("@/assets/images/icon.png"),
+    icon: require("../../../assets/images/icon.png"),
     money: -50000, // số tiền mình nợ (âm) hoặc được hoàn (dương)
     recentActivity: {
       description: "A đã thanh toán cho Trà sữa",
@@ -49,12 +55,12 @@ const groupList = [
   },
   {
     id: 3,
-    avt: require("@/assets/images/icon.png"),
+    avt: require("../../../assets/images/icon.png"),
     name: "Du lịch Kon tum",
     members: 4,
     type: "Du lịch",
     settled: true, // đã quyết toán chưa
-    icon: require("@/assets/images/icon.png"),
+    icon: require("../../../assets/images/icon.png"),
     money: -50000, // số tiền mình nợ (âm) hoặc được hoàn (dương)
     recentActivity: {
       description: "A đã thanh toán cho Trà sữa",
@@ -63,12 +69,12 @@ const groupList = [
   },
   {
     id: 4,
-    avt: require("@/assets/images/icon.png"),
+    avt: require("../../../assets/images/icon.png"),
     name: "Tiền nhà trọ",
     members: 4,
     type: "Du lịch",
     settled: false,
-    icon: require("@/assets/images/icon.png"),
+    icon: require("../../../assets/images/icon.png"),
     money: -50000,
     recentActivity: {
       description: "A đã thanh toán cho Trà sữa",
@@ -79,7 +85,13 @@ const groupList = [
 
 export default function Index() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState(1);
+  const [selectedStatus, setSelectedStatus] = useState(10);
+
+  const [groups, setGroups] = useState<Group[]>([]);
+
+  const [loading, setLoading] = useState(true);
+
+  const [refreshing, setRefreshing] = useState(false);
 
   const {
     lightGray,
@@ -93,9 +105,82 @@ export default function Index() {
     darkGreen,
   } = useAppTheme();
 
+  const fetchGroups = async () => {
+    try {
+      const data = await groupService.getGroups();
+
+      setGroups(data);
+    } catch (error) {
+      console.log("Get groups error:", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchGroups();
+  }, []);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+
+    await fetchGroups();
+  };
+
+  const filteredGroups = useMemo(() => {
+    return groups.filter((group) => {
+      const matchSearch = group.name
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase());
+
+      const matchStatus =
+        selectedStatus === 10
+          ? true
+          : selectedStatus === 20
+            ? group.status === "active"
+            : group.status === "closed";
+
+      return matchSearch && matchStatus;
+    });
+  }, [groups, searchQuery, selectedStatus]);
+
+  if (loading) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: backgroundWhite,
+        }}
+      >
+        <ActivityIndicator size="large" color={darkGreen} />
+      </View>
+    );
+  }
+
+  const handleSearch = () => {
+    console.log("Search pressed");
+    // TODO: Navigate to search screen
+  };
+
+  const handleSettings = () => {
+    console.log("Settings pressed");
+    // TODO: Navigate to settings screen
+  };
+
   return (
     // fix button
-    <View>
+    <View style={{ flex: 1 }}>
+      <TopAppBar
+        title="EasySplit"
+        showBack={false}
+        showSearch={true}
+        showSettings={true}
+        onSearchPress={handleSearch}
+        onSettingsPress={handleSettings}
+      />
       <TouchableOpacity
         style={{
           position: "absolute",
@@ -112,13 +197,13 @@ export default function Index() {
       </TouchableOpacity>
       <ScrollView
         contentContainerStyle={{
-          paddingTop: 60,
+          paddingTop: 16,
           paddingLeft: 20,
           paddingRight: 20,
           paddingBottom: 20,
         }}
       >
-        <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 20 }}>
+        <Text style={{ fontSize: 24, fontWeight: "bold", marginBottom: 16 }}>
           Nhóm
         </Text>
 
@@ -144,16 +229,20 @@ export default function Index() {
         </View>
 
         {/* Selected bar */}
-        <View
-          style={{
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{
             flexDirection: "row",
             marginBottom: 20,
-            justifyContent: "space-between",
+            justifyContent: "center",
             gap: 8,
+            flexGrow: 1,
           }}
         >
           {status.map((item) => (
             <TouchableOpacity
+              key={item.id}
               style={{
                 backgroundColor:
                   selectedStatus === item.id ? successGreen : lightGray,
@@ -175,10 +264,11 @@ export default function Index() {
               </Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
+        {/* </View> */}
 
         {/* Group List */}
-        {groupList.map((item) => (
+        {filteredGroups.map((item) => (
           <TouchableOpacity
             key={item.id}
             style={{
@@ -199,7 +289,7 @@ export default function Index() {
             >
               <View style={{ flexDirection: "row", gap: 4 }}>
                 <Image
-                  source={item.avt}
+                  source={groupList[0].avt}
                   style={{
                     width: 50,
                     height: 50,
@@ -213,7 +303,7 @@ export default function Index() {
                   </Text>
                   <View style={{ flexDirection: "row", alignItems: "center" }}>
                     <Image
-                      source={item.icon}
+                      source={groupList[0].icon}
                       style={{
                         width: 20,
                         height: 20,
@@ -222,7 +312,7 @@ export default function Index() {
                       }}
                     />
                     <Text style={{ fontSize: 14 }}>
-                      {item.type} • {item.members} thành viên
+                      {item.category} • {item.memberCount} thành viên
                     </Text>
                   </View>
                 </View>
@@ -232,7 +322,7 @@ export default function Index() {
             </View>
 
             <View>
-              {item.settled ? (
+              {item.status === "closed" ? (
                 <View
                   style={{
                     backgroundColor: lightGray,
@@ -264,7 +354,7 @@ export default function Index() {
                   <View
                     style={[
                       { flexDirection: "column", width: "50%" },
-                      item.money < 0
+                      groupList[0].money < 0
                         ? { backgroundColor: lightRed }
                         : { backgroundColor: lightGreen },
                       { padding: 10, borderRadius: 5, alignSelf: "flex-start" },
@@ -273,20 +363,20 @@ export default function Index() {
                     <Text
                       style={[
                         { fontSize: 16, fontWeight: "600", marginBottom: 8 },
-                        item.money < 0
+                        groupList[0].money < 0
                           ? { color: errorRed }
                           : { color: successGreen },
                       ]}
                     >
                       Trạng thái
                     </Text>
-                    {item.money < 0 ? (
+                    {groupList[0].money < 0 ? (
                       <View style={{ flexDirection: "column" }}>
                         <Text style={{ color: errorRed, fontWeight: "600" }}>
                           Bạn đang nợ
                         </Text>
                         <Text style={{ color: errorRed, fontWeight: "600" }}>
-                          {Math.abs(item.money)} đ
+                          {Math.abs(groupList[0].money)} đ
                         </Text>
                       </View>
                     ) : (
@@ -299,7 +389,7 @@ export default function Index() {
                         <Text
                           style={{ color: successGreen, fontWeight: "600" }}
                         >
-                          {Math.abs(item.money)} đ
+                          {Math.abs(groupList[0].money)} đ
                         </Text>
                       </View>
                     )}
@@ -322,10 +412,10 @@ export default function Index() {
                         marginBottom: 12,
                       }}
                     >
-                      {item.recentActivity.time}
+                      {item.createdAt}
                     </Text>
                     <Text style={{ fontSize: 14, color: textColor }}>
-                      {item.recentActivity.description}
+                      {groupList[0].recentActivity.description}
                     </Text>
                   </View>
                 </View>

@@ -1,10 +1,11 @@
+import { FontFamily } from "@/constants/fonts";
 import { useThemeColor } from "@/hooks/use-theme-color";
 
 export function useAppTheme() {
   return {
     textColor: useThemeColor({}, "text"),
     backgroundColor: useThemeColor({}, "background"),
-    // iconDefaultColor: useThemeColor({}, "tabIconDefault"),
+    iconDefaultColor: useThemeColor({}, "tabIconDefault"),
     selected: useThemeColor({}, "primaryGreen"),
     successGreen: useThemeColor({}, "successGreen"),
     errorRed: useThemeColor({}, "errorRed"),
@@ -15,5 +16,12 @@ export function useAppTheme() {
     lightRed: useThemeColor({}, "lightRed"),
     lightGreen: useThemeColor({}, "lightGreen"),
     darkGreen: useThemeColor({}, "darkGreen"),
+    // Font families
+    fontRegular: FontFamily.regular,
+    fontMedium: FontFamily.medium,
+    fontSemibold: FontFamily.semibold,
+    fontBold: FontFamily.bold,
+    fontExtrabold: FontFamily.extrabold,
+    fontBlack: FontFamily.black,
   };
 }
