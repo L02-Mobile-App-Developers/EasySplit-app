@@ -1,423 +1,164 @@
+import { AntDesign, MaterialIcons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import { useMemo, useState } from "react";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+
 import TopAppBar from "@/components/TopAppBar";
-import * as ImagePicker from "expo-image-picker";
-import React, { useState } from "react";
-import {
-  Image,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { groupService } from "@/api/services/group.service";
+import type { GroupCategory } from "@/api/types/group";
 
-import {
-  Entypo,
-  Feather,
-  FontAwesome5,
-  FontAwesome6,
-  MaterialCommunityIcons,
-  MaterialIcons,
-} from "@expo/vector-icons";
-
-import { FriendInfo } from "@/types";
-
-// Loại nhóm
-const groupTypes = [
-  {
-    id: 1,
-    name: "Ăn uống",
-    icon: (color: string) => (
-      <MaterialCommunityIcons
-        name="silverware-fork-knife"
-        size={16}
-        color={color}
-      />
-    ),
-  },
-  {
-    id: 2,
-    name: "Du lịch",
-    icon: (color: string) => (
-      <FontAwesome5 name="plane-departure" size={16} color={color} />
-    ),
-  },
-  {
-    id: 3,
-    name: "Ở trọ",
-    icon: (color: string) => (
-      <FontAwesome6 name="house" size={16} color={color} />
-    ),
-  },
-  {
-    id: 4,
-    name: "Sự kiện",
-    icon: (color: string) => (
-      <MaterialCommunityIcons name="party-popper" size={16} color={color} />
-    ),
-  },
-  // {
-  //   id: 5,
-  //   name: "Khác",
-  //   icon: (color: string) => (
-  //     <AntDesign name="ellipsis" size={16} color={color} />
-  //   ),
-  // },
+const categories: Array<{ value: GroupCategory; label: string; hint: string }> = [
+  { value: "trip", label: "Du lịch", hint: "Chuyến đi ngắn hoặc dài ngày" },
+  { value: "food", label: "Ăn uống", hint: "Ăn trưa, café, tiệc nhỏ" },
+  { value: "roommate", label: "Ở chung", hint: "Tiền nhà, điện nước" },
+  { value: "project", label: "Dự án", hint: "Công việc, team, lớp học" },
+  { value: "other", label: "Khác", hint: "Nhóm dùng chung linh hoạt" },
 ];
 
-// thông tin user
-const users = [
-  {
-    id: 1,
-    name: "Nguyễn Văn A",
-    avatar: "https://randomuser.me/api/portraits/men/1.jpg",
-    gmail: "nguyenvanA@gmail.com",
-  },
-  {
-    id: 2,
-    name: "Trần Thị B",
-    avatar: "https://randomuser.me/api/portraits/women/2.jpg",
-    gmail: "tranthiB@gmail.com",
-  },
-  {
-    id: 3,
-    name: "Lê Văn C",
-    avatar: "https://randomuser.me/api/portraits/men/3.jpg",
-    gmail: "LevanC@gmail.com",
-  },
-];
+const memberSuggestions = ["Mai", "Nam", "Vy", "Khoa", "Linh", "Huy"];
 
-// card mà được add
-const AddedMemberCard: React.FC<
-  FriendInfo & {
-    onRemove: () => void;
-  }
-> = ({ name, avatar, onRemove }) => {
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 10,
-        backgroundColor: "white",
-        padding: 8,
-        borderRadius: 20,
-        alignSelf: "flex-start", // chỉ chiếm vừa đủ nội dung
-      }}
-    >
-      <Image
-        source={{ uri: avatar }}
-        style={{
-          width: 30,
-          height: 30,
-          borderRadius: 25,
-        }}
-      />
-      <Text style={{ color: "black", fontSize: 12 }}>{name}</Text>
-      <Pressable onPress={onRemove}>
-        <Feather name="x-circle" size={16} color="red" />
-      </Pressable>
-    </View>
-  );
-};
+export default function AddGroupScreen() {
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState<GroupCategory>("trip");
+  const [selectedMembers, setSelectedMembers] = useState<string[]>(["Mai", "Nam"]);
 
-// card chưa add
-const MemberCard: React.FC<
-  FriendInfo & {
-    onToggle: () => void;
-    isAdded: boolean;
-  }
-> = ({ name, avatar, gmail, onToggle, isAdded }) => {
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 10,
-        backgroundColor: "white",
-        paddingVertical: 16,
-        paddingHorizontal: 12,
-        borderRadius: 20,
-        flex: 1, // chiếm hết chiều ngang
-        justifyContent: "space-between",
-      }}
-    >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
-        <Image
-          source={{ uri: avatar }}
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 12,
-          }}
-        />
-        <View style={{ flexDirection: "column", gap: 2 }}>
-          <Text style={{ color: "black", fontSize: 14, fontWeight: "bold" }}>
-            {name}
-          </Text>
-          <Text style={{ color: "gray", fontSize: 10 }}>{gmail}</Text>
-        </View>
-      </View>
+  const selectedCategory = useMemo(() => categories.find((item) => item.value === category), [category]);
 
-      <Pressable onPress={onToggle}>
-        {isAdded ? (
-          <FontAwesome6
-            name="check-circle"
-            size={24}
-            color="green"
-            style={{ marginRight: 6 }}
-          />
-        ) : (
-          <Entypo
-            name="circle"
-            size={24}
-            color="black"
-            style={{ marginRight: 6 }}
-          />
-        )}
-      </Pressable>
-    </View>
-  );
-};
-
-export default function Index() {
-  const [image, setImage] = useState<string | null>(null);
-  const [memberToAdd, setMemberToAdd] = useState<FriendInfo[]>([]); // danh sách member đang add
-  const [groupType, setGroupType] = useState<string | null>(null); // loại nhóm đang chọn
-  const [groupName, setGroupName] = useState("");
-
-  // function thêm user vào danh sách đang add
-  const handleAddMember = (user: FriendInfo) => {
-    setMemberToAdd((prev) => [...prev, user]);
+  const toggleMember = (member: string) => {
+    setSelectedMembers((current) =>
+      current.includes(member)
+        ? current.filter((item) => item !== member)
+        : [...current, member],
+    );
   };
 
-  const handleRemoveMember = (user: FriendInfo) => {
-    setMemberToAdd((prev) => prev.filter((item) => item.id !== user.id));
-  };
-
-  const pickImage = async () => {
-    // xin quyền
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) return;
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
-    });
-
-    if (!result.canceled) {
-      setImage(result.assets[0].uri); // lấy uri
+  const handleCreate = async () => {
+    if (!name.trim()) {
+      Alert.alert("Thiếu thông tin", "Vui lòng nhập tên nhóm.");
+      return;
     }
 
-    // console.log(image);
+    try {
+      await groupService.createGroup({ name: name.trim(), category });
+      Alert.alert("Đã tạo nhóm", `Nhóm ${name} đã sẵn sàng.`, [{ text: "OK", onPress: () => router.back() }]);
+    } catch (error) {
+      console.error("Create group failed", error);
+      Alert.alert("Không thể tạo nhóm", "Thử lại sau nhé.");
+    }
   };
 
   return (
-    <View>
-      {/* HEADER */}
-      <TopAppBar title="Tạo nhóm mới" showBack />
-      <ScrollView
-        contentContainerStyle={{
-          paddingTop: 12,
-          paddingLeft: 20,
-          paddingRight: 20,
-          paddingBottom: 120,
-        }}
-      >
-        {/* Upload Image */}
-        <Pressable
-          onPress={pickImage}
-          style={{
-            alignItems: "center",
-            justifyContent: "center",
-            marginBottom: 20,
-          }}
-        >
-          {image ? (
-            <Image
-              source={{ uri: image }}
-              style={{
-                width: 100,
-                height: 100,
-                borderRadius: 20,
-              }}
+    <View style={styles.screen}>
+      <TopAppBar title="Tạo nhóm" showBack />
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.heroCard}>
+          <View style={styles.badge}><Text style={styles.badgeText}>Material</Text></View>
+          <Text style={styles.title}>Tạo một nhóm mới</Text>
+          <Text style={styles.subtitle}>Đặt tên, chọn loại nhóm và thêm vài người thân quen trước khi bắt đầu ghi chi tiêu.</Text>
+        </View>
+
+        <View style={styles.sectionCard}>
+          <Text style={styles.label}>Tên nhóm</Text>
+          <View style={styles.inputRow}>
+            <MaterialIcons name="groups" size={20} color="#0F5E28" />
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              placeholder="Nhập tên nhóm"
+              placeholderTextColor="#9CA3AF"
+              style={styles.input}
             />
-          ) : (
-            <View
-              style={{
-                width: 100,
-                height: 100,
-                borderRadius: 20,
-                backgroundColor: "#E5E7EB",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Text>Chọn ảnh</Text>
-            </View>
-          )}
-        </Pressable>
+          </View>
+        </View>
 
-        {/* Tên nhóm */}
-        <Text style={{ marginBottom: 10 }}>Tên nhóm</Text>
-        <TextInput
-          placeholder="Nhập tên nhóm"
-          placeholderTextColor="#999"
-          value={groupName}
-          onChangeText={setGroupName}
-          style={{
-            backgroundColor: "#e7e8e9ff",
-            padding: 16,
-            borderRadius: 10,
-            color: "#333",
-            marginBottom: 12,
-          }}
-        />
-
-        {/* Loại nhóm */}
-        <Text style={{ marginVertical: 10 }}>Loại nhóm</Text>
-        <View
-          style={{
-            flexDirection: "row",
-            flexWrap: "wrap",
-            gap: 10,
-          }}
-        >
-          {groupTypes.map((type) => (
-            <Pressable key={type.id} onPress={() => setGroupType(type.name)}>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 10,
-                  backgroundColor:
-                    groupType === type.name ? "#16a34a" : "#e7e8e9ff",
-                  paddingVertical: 12,
-                  paddingHorizontal: 16,
-                  borderRadius: 30,
-                }}
-              >
-                {type.icon(groupType === type.name ? "white" : "black")}
-
-                <Text
-                  style={{
-                    color: groupType === type.name ? "white" : "black",
-                    fontWeight: groupType === type.name ? "bold" : "normal",
-                  }}
+        <View style={styles.sectionCard}>
+          <Text style={styles.label}>Danh mục</Text>
+          <View style={styles.categoryGrid}>
+            {categories.map((item) => {
+              const active = item.value === category;
+              return (
+                <Pressable
+                  key={item.value}
+                  onPress={() => setCategory(item.value)}
+                  style={[styles.categoryCard, active ? styles.categoryCardActive : styles.categoryCardInactive]}
                 >
-                  {type.name}
-                </Text>
-              </View>
-            </Pressable>
-          ))}
+                  <View style={[styles.categoryIcon, active ? styles.categoryIconActive : styles.categoryIconInactive]}>
+                    <MaterialIcons name={active ? "check-circle" : "radio-button-unchecked"} size={18} color={active ? "#FFFFFF" : "#0F5E28"} />
+                  </View>
+                  <Text style={styles.categoryTitle}>{item.label}</Text>
+                  <Text style={styles.categoryHint}>{item.hint}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <View style={styles.activeCategoryBanner}>
+            <Text style={styles.activeCategoryLabel}>Đang chọn</Text>
+            <Text style={styles.activeCategoryValue}>{selectedCategory?.label}</Text>
+          </View>
         </View>
 
-        {/* Thành viên */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 10,
-            marginTop: 20,
-          }}
-        >
-          <Text>Thêm thành viên</Text>
-          <Text style={{ color: "green" }}>
-            {memberToAdd.length} thành viên đã được chọn
-          </Text>
+        <View style={styles.sectionCard}>
+          <View style={styles.rowBetween}>
+            <Text style={styles.label}>Gợi ý thành viên</Text>
+            <Text style={styles.counter}>{selectedMembers.length} người</Text>
+          </View>
+          <View style={styles.memberGrid}>
+            {memberSuggestions.map((member) => {
+              const active = selectedMembers.includes(member);
+              return (
+                <Pressable
+                  key={member}
+                  onPress={() => toggleMember(member)}
+                  style={[styles.memberChip, active ? styles.memberChipActive : styles.memberChipInactive]}
+                >
+                  <Text style={[styles.memberChipText, active ? styles.memberChipTextActive : styles.memberChipTextInactive]}>{member}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
 
-        {/* Danh sách đang add */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{
-            flexDirection: "row",
-            gap: 10,
-            padding: 10,
-            alignItems: "center",
-          }}
-          style={{
-            marginTop: 10,
-            backgroundColor: "#e7e8e9ff",
-            borderRadius: 10,
-            minHeight: 66,
-          }}
-        >
-          {memberToAdd.map((user) => (
-            <AddedMemberCard
-              key={user.id}
-              id={user.id}
-              name={user.name}
-              avatar={user.avatar}
-              gmail={user.gmail}
-              onRemove={() => handleRemoveMember(user)}
-            />
-          ))}
-        </ScrollView>
-
-        {/* Danh sách chưa add */}
-        <View
-          style={{
-            flexDirection: "column",
-            gap: 10,
-            marginTop: 16,
-            backgroundColor: "#e7e8e9ff",
-            padding: 10,
-            borderRadius: 10,
-          }}
-        >
-          {users.map((user) => {
-            const isAdded = memberToAdd.some((item) => item.id === user.id);
-
-            return (
-              <MemberCard
-                key={user.id}
-                id={user.id}
-                name={user.name}
-                avatar={user.avatar}
-                gmail={user.gmail}
-                isAdded={isAdded}
-                onToggle={() => {
-                  if (isAdded) {
-                    handleRemoveMember(user);
-                  } else {
-                    handleAddMember(user);
-                  }
-                }}
-              />
-            );
-          })}
-        </View>
-
-        {/* Button */}
-        <View>
-          <Pressable
-            style={{
-              backgroundColor: "green",
-              paddingVertical: 14,
-              borderRadius: 10,
-              alignItems: "center",
-              marginTop: 20,
-              flexDirection: "row",
-              justifyContent: "center",
-              gap: 8,
-            }}
-            onPress={() => {
-              // Xử lý tạo nhóm
-            }}
-          >
-            <Text style={{ color: "white", fontSize: 16, fontWeight: "bold" }}>
-              Tạo nhóm
-            </Text>
-            <MaterialIcons name="group-add" size={24} color="white" />
-          </Pressable>
-        </View>
-
-        {/*  */}
+        <Pressable onPress={handleCreate} style={styles.primaryButton}>
+          <Text style={styles.primaryButtonText}>Tạo nhóm</Text>
+        </Pressable>
       </ScrollView>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: "#F4F7F4" },
+  content: { padding: 20, gap: 14 },
+  heroCard: { backgroundColor: "#FFFFFF", borderRadius: 28, padding: 18, gap: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.05, shadowRadius: 14, elevation: 2 },
+  badge: { alignSelf: "flex-start", backgroundColor: "#EAF6EE", borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
+  badgeText: { color: "#0F5E28", fontWeight: "800", fontSize: 12 },
+  title: { fontSize: 24, fontWeight: "800", color: "#0F172A" },
+  subtitle: { color: "#6B7280", lineHeight: 20 },
+  sectionCard: { backgroundColor: "#FFFFFF", borderRadius: 24, padding: 16, gap: 12, shadowColor: "#000", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 2 },
+  label: { color: "#6B7280", fontSize: 12, fontWeight: "800", textTransform: "uppercase" },
+  inputRow: { flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderColor: "#E5E7EB", backgroundColor: "#F7F9F7", borderRadius: 18, paddingHorizontal: 14, paddingVertical: 14 },
+  input: { flex: 1, color: "#0F172A", fontSize: 15 },
+  categoryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  categoryCard: { width: "48%", borderRadius: 22, padding: 14, gap: 8, borderWidth: 1 },
+  categoryCardActive: { backgroundColor: "#0F5E28", borderColor: "#0F5E28" },
+  categoryCardInactive: { backgroundColor: "#F7F9F7", borderColor: "#E5E7EB" },
+  categoryIcon: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
+  categoryIconActive: { backgroundColor: "rgba(255,255,255,0.18)" },
+  categoryIconInactive: { backgroundColor: "#EAF6EE" },
+  categoryTitle: { fontWeight: "800", color: "#0F172A" },
+  categoryHint: { color: "#6B7280", fontSize: 12, lineHeight: 17 },
+  activeCategoryBanner: { borderRadius: 18, backgroundColor: "#F0F9F3", padding: 14, gap: 4 },
+  activeCategoryLabel: { color: "#6B7280", fontSize: 12, fontWeight: "700" },
+  activeCategoryValue: { color: "#0F5E28", fontWeight: "800" },
+  rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  counter: { color: "#16A34A", fontWeight: "800" },
+  memberGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  memberChip: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1 },
+  memberChipActive: { backgroundColor: "#0F5E28", borderColor: "#0F5E28" },
+  memberChipInactive: { backgroundColor: "#FFFFFF", borderColor: "#E5E7EB" },
+  memberChipText: { fontWeight: "700" },
+  memberChipTextActive: { color: "#FFFFFF" },
+  memberChipTextInactive: { color: "#0F172A" },
+  primaryButton: { backgroundColor: "#0F5E28", paddingVertical: 15, borderRadius: 18, alignItems: "center" },
+  primaryButtonText: { color: "#FFFFFF", fontWeight: "800" },
+});

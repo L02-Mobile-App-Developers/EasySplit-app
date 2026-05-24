@@ -1,32 +1,11 @@
-import TopAppBar from "@/components/TopAppBar";
-import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
-import { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Image,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
-
-import { authService } from "@/api/services/auth.service";
+import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
-type ProfileData = {
-  name: string;
-  email: string;
-  phone: string;
-  groups: number;
-  friends: number;
-  transactions: number;
-  avatar: { uri: string } | number;
-};
+import TopAppBar from "@/components/TopAppBar";
 
-// Mock profile data
-const mockProfileData: ProfileData = {
+const mockProfileData = {
   name: "Minh Nguyen",
   email: "minh@gmail.com",
   phone: "090xxxxxxx",
@@ -36,16 +15,12 @@ const mockProfileData: ProfileData = {
   avatar: require("../../../assets/images/icon.png"),
 };
 
-// Simulate API call to fetch profile
-const fetchProfileData = () => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(mockProfileData);
-    }, 2000); // 2 second delay
-  });
-};
+const fetchProfileData = () =>
+  new Promise((resolve) => setTimeout(() => resolve(mockProfileData), 700));
 
-const ProfileScreen = () => {
+type ProfileData = typeof mockProfileData;
+
+export default function ProfileScreen() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [draft, setDraft] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,6 +34,7 @@ const ProfileScreen = () => {
       setDraft(data);
       setLoading(false);
     };
+
     loadProfile();
   }, []);
 
@@ -74,46 +50,19 @@ const ProfileScreen = () => {
     setIsEditing(false);
   };
 
-  const handlePickAvatar = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.9,
-    });
-
-    if (!result.canceled && result.assets[0]?.uri) {
-      setDraft((current) => {
-        if (!current) return current;
-        return { ...current, avatar: { uri: result.assets[0].uri } };
-      });
-    }
-  };
-
   const handleSaveProfile = () => {
     if (!draft) return;
-
     setProfile(draft);
     setIsEditing(false);
   };
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: "#F7F9FB" }}>
-        <TopAppBar title="EasySplit" showBack={false} showSearch showSettings />
-        <View
-          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-        >
+      <View style={styles.screen}>
+        <TopAppBar title="Cá nhân" showSearch showSettings />
+        <View style={styles.center}>
           <ActivityIndicator size="large" color="#16A34A" />
-          <Text style={{ marginTop: 12, color: "#6B7280", fontSize: 14 }}>
-            Đang tải hồ sơ...
-          </Text>
+          <Text style={styles.loadingText}>Đang tải hồ sơ...</Text>
         </View>
       </View>
     );
@@ -121,522 +70,221 @@ const ProfileScreen = () => {
 
   if (!profile) {
     return (
-      <View style={{ flex: 1, backgroundColor: "#F7F9FB" }}>
-        <TopAppBar title="EasySplit" showBack={false} showSearch showSettings />
-        <View
-          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-        >
-          <Text style={{ color: "#6B7280" }}>Không thể tải dữ liệu</Text>
+      <View style={styles.screen}>
+        <TopAppBar title="Cá nhân" showSearch showSettings />
+        <View style={styles.center}>
+          <Text style={styles.loadingText}>Không thể tải dữ liệu</Text>
         </View>
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#F7F9FB" }}>
-      <TopAppBar title="EasySplit" showBack={false} showSearch showSettings />
+    <View style={styles.screen}>
+      <TopAppBar title="Cá nhân" showSearch showSettings />
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
-        {/* Profile Information Section */}
-        <View
-          style={{ alignItems: "center", paddingTop: 32, paddingBottom: 28 }}
-        >
-          {/* Avatar with Edit Badge */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={isEditing ? handlePickAvatar : beginEditing}
-            style={{ position: "relative", marginBottom: 16 }}
-          >
-            <Image
-              source={draft?.avatar || profile.avatar}
-              style={{
-                width: 120,
-                height: 120,
-                borderRadius: 60,
-                borderWidth: 4,
-                borderColor: "#16A34A",
-              }}
-            />
-            <View
-              style={{
-                position: "absolute",
-                bottom: 0,
-                right: 0,
-                width: 40,
-                height: 40,
-                borderRadius: 20,
-                backgroundColor: "#16A34A",
-                borderWidth: 3,
-                borderColor: "#fff",
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <MaterialIcons
-                name={isEditing ? "photo-library" : "edit"}
-                size={20}
-                color="#fff"
-              />
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.heroCard}>
+          <View style={styles.avatarWrap}>
+            <Image source={draft?.avatar || profile.avatar} style={styles.avatar} />
+            <View style={styles.avatarBadge}>
+              <MaterialIcons name={isEditing ? "photo-library" : "edit"} size={18} color="#fff" />
             </View>
-          </TouchableOpacity>
+          </View>
 
-          {isEditing && (
-            <Text style={{ color: "#6B7280", fontSize: 12, marginBottom: 12 }}>
-              Chạm vào ảnh đại diện để đổi ảnh
-            </Text>
-          )}
+          <Text style={styles.nameText}>{draft?.name ?? profile.name}</Text>
+          <Text style={styles.emailText}>{draft?.email ?? profile.email}</Text>
+          <Text style={styles.phoneText}>{draft?.phone ?? profile.phone}</Text>
 
-          {/* User Details */}
+          <View style={styles.statsRow}>
+            <StatCard label="Nhóm" value={profile.groups} />
+            <StatCard label="Bạn bè" value={profile.friends} />
+            <StatCard label="Giao dịch" value={profile.transactions} />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Thông tin cá nhân</Text>
           {isEditing ? (
-            <View style={{ width: "100%", paddingHorizontal: 20, gap: 10 }}>
-              <TextInput
-                value={draft?.name ?? ""}
-                onChangeText={(value) =>
-                  setDraft((current) =>
-                    current ? { ...current, name: value } : current,
-                  )
-                }
-                placeholder="Họ và tên"
-                placeholderTextColor="#9CA3AF"
-                style={{
-                  backgroundColor: "#fff",
-                  borderWidth: 1,
-                  borderColor: "#E5E7EB",
-                  borderRadius: 14,
-                  paddingHorizontal: 14,
-                  paddingVertical: 12,
-                  fontSize: 16,
-                  color: "#0F172A",
-                }}
-              />
-              <TextInput
-                value={draft?.email ?? ""}
-                onChangeText={(value) =>
-                  setDraft((current) =>
-                    current ? { ...current, email: value } : current,
-                  )
-                }
-                placeholder="Email"
-                placeholderTextColor="#9CA3AF"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                style={{
-                  backgroundColor: "#fff",
-                  borderWidth: 1,
-                  borderColor: "#E5E7EB",
-                  borderRadius: 14,
-                  paddingHorizontal: 14,
-                  paddingVertical: 12,
-                  fontSize: 16,
-                  color: "#0F172A",
-                }}
-              />
-              <TextInput
-                value={draft?.phone ?? ""}
-                onChangeText={(value) =>
-                  setDraft((current) =>
-                    current ? { ...current, phone: value } : current,
-                  )
-                }
-                placeholder="Số điện thoại"
-                placeholderTextColor="#9CA3AF"
-                keyboardType="phone-pad"
-                style={{
-                  backgroundColor: "#fff",
-                  borderWidth: 1,
-                  borderColor: "#E5E7EB",
-                  borderRadius: 14,
-                  paddingHorizontal: 14,
-                  paddingVertical: 12,
-                  fontSize: 16,
-                  color: "#0F172A",
-                }}
-              />
-
-              <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={cancelEditing}
-                  style={{
-                    flex: 1,
-                    backgroundColor: "#F3F4F6",
-                    borderRadius: 14,
-                    paddingVertical: 13,
-                    alignItems: "center",
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 15,
-                      fontWeight: "700",
-                      color: "#374151",
-                    }}
-                  >
-                    Hủy
-                  </Text>
+            <View style={styles.formCard}>
+              <Input value={draft?.name ?? ""} placeholder="Họ và tên" onChangeText={(value) => setDraft((current) => (current ? { ...current, name: value } : current))} />
+              <Input value={draft?.email ?? ""} placeholder="Email" onChangeText={(value) => setDraft((current) => (current ? { ...current, email: value } : current))} />
+              <Input value={draft?.phone ?? ""} placeholder="Số điện thoại" onChangeText={(value) => setDraft((current) => (current ? { ...current, phone: value } : current))} />
+              <View style={styles.buttonRow}>
+                <TouchableOpacity style={[styles.secondaryButton, { borderColor: "#E5E7EB" }]} onPress={cancelEditing}>
+                  <Text style={styles.secondaryButtonText}>Hủy</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={handleSaveProfile}
-                  style={{
-                    flex: 1,
-                    backgroundColor: "#16A34A",
-                    borderRadius: 14,
-                    paddingVertical: 13,
-                    alignItems: "center",
-                  }}
-                >
-                  <Text
-                    style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}
-                  >
-                    Lưu hồ sơ
-                  </Text>
+                <TouchableOpacity style={[styles.primaryButton, { backgroundColor: "#16A34A" }]} onPress={handleSaveProfile}>
+                  <Text style={styles.primaryButtonText}>Lưu</Text>
                 </TouchableOpacity>
               </View>
             </View>
           ) : (
-            <>
-              <Text
-                style={{
-                  fontSize: 24,
-                  fontWeight: "700",
-                  color: "#0F172A",
-                  marginBottom: 6,
-                }}
-              >
-                {profile.name}
-              </Text>
-              <Text style={{ fontSize: 14, color: "#6B7280", marginBottom: 4 }}>
-                {profile.email}
-              </Text>
-              <Text style={{ fontSize: 14, color: "#9CA3AF" }}>
-                {profile.phone}
-              </Text>
-            </>
+            <TouchableOpacity activeOpacity={0.85} onPress={beginEditing} style={styles.infoCard}>
+              <MaterialIcons name="account-circle" size={24} color="#16A34A" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.infoTitle}>Cập nhật hồ sơ</Text>
+                <Text style={styles.infoText}>Chỉnh sửa tên, email và số điện thoại của bạn.</Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={24} color="#6B7280" />
+            </TouchableOpacity>
           )}
         </View>
 
-        {/* Statistics Cards */}
-        <View
-          style={{
-            flexDirection: "row",
-            paddingHorizontal: 20,
-            marginBottom: 24,
-            gap: 12,
-          }}
-        >
-          {/* Card 1 - Groups */}
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: "#F3F4F6",
-              borderRadius: 20,
-              paddingVertical: 16,
-              paddingHorizontal: 12,
-              alignItems: "center",
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 28,
-                fontWeight: "700",
-                color: "#16A34A",
-                marginBottom: 6,
-              }}
-            >
-              {profile.groups}
-            </Text>
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: "700",
-                color: "#6B7280",
-                letterSpacing: 0.5,
-              }}
-            >
-              SỐ NHÓM
-            </Text>
-          </View>
-
-          {/* Card 2 - Friends */}
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: "#F3F4F6",
-              borderRadius: 20,
-              paddingVertical: 16,
-              paddingHorizontal: 12,
-              alignItems: "center",
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 28,
-                fontWeight: "700",
-                color: "#16A34A",
-                marginBottom: 6,
-              }}
-            >
-              {profile.friends}
-            </Text>
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: "700",
-                color: "#6B7280",
-                letterSpacing: 0.5,
-              }}
-            >
-              SỐ BẠN BÈ
-            </Text>
-          </View>
-
-          {/* Card 3 - Transactions */}
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: "#F3F4F6",
-              borderRadius: 20,
-              paddingVertical: 16,
-              paddingHorizontal: 12,
-              alignItems: "center",
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 28,
-                fontWeight: "700",
-                color: "#16A34A",
-                marginBottom: 6,
-              }}
-            >
-              {profile.transactions}
-            </Text>
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: "700",
-                color: "#6B7280",
-                letterSpacing: 0.5,
-              }}
-            >
-              GIAO DỊCH
-            </Text>
-          </View>
-        </View>
-
-        {/* Action Menu */}
-        <View
-          style={{
-            marginHorizontal: 20,
-            backgroundColor: "#fff",
-            borderRadius: 20,
-            overflow: "hidden",
-            marginBottom: 16,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.04,
-            shadowRadius: 6,
-            elevation: 1,
-          }}
-        >
-          {/* Edit Profile */}
-          <TouchableOpacity
-            onPress={beginEditing}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              paddingHorizontal: 16,
-              paddingVertical: 14,
-              borderBottomWidth: 1,
-              borderBottomColor: "#E6E7E8",
-            }}
-          >
-            <View
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 12,
-                backgroundColor: "#DBE9F5",
-                justifyContent: "center",
-                alignItems: "center",
-                marginRight: 12,
-              }}
-            >
-              <MaterialCommunityIcons
-                name="account-edit"
-                size={22}
-                color="#0F172A"
-              />
-            </View>
-            <Text
-              style={{
-                flex: 1,
-                fontSize: 16,
-                fontWeight: "500",
-                color: "#0F172A",
-              }}
-            >
-              Chỉnh sửa hồ sơ
-            </Text>
-            <MaterialIcons name="chevron-right" size={24} color="#6B7280" />
-          </TouchableOpacity>
-
-          {/* Settings */}
-          <TouchableOpacity
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              paddingHorizontal: 16,
-              paddingVertical: 14,
-              borderBottomWidth: 1,
-              borderBottomColor: "#E6E7E8",
-            }}
-          >
-            <View
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 12,
-                backgroundColor: "#DBE9F5",
-                justifyContent: "center",
-                alignItems: "center",
-                marginRight: 12,
-              }}
-            >
-              <MaterialCommunityIcons name="cog" size={22} color="#0F172A" />
-            </View>
-            <Text
-              style={{
-                flex: 1,
-                fontSize: 16,
-                fontWeight: "500",
-                color: "#0F172A",
-              }}
-            >
-              Cài đặt
-            </Text>
-            <MaterialIcons name="chevron-right" size={24} color="#6B7280" />
-          </TouchableOpacity>
-
-          {/* Help */}
-          <TouchableOpacity
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              paddingHorizontal: 16,
-              paddingVertical: 14,
-            }}
-          >
-            <View
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 12,
-                backgroundColor: "#DBE9F5",
-                justifyContent: "center",
-                alignItems: "center",
-                marginRight: 12,
-              }}
-            >
-              <MaterialCommunityIcons
-                name="help-circle"
-                size={22}
-                color="#0F172A"
-              />
-            </View>
-            <Text
-              style={{
-                flex: 1,
-                fontSize: 16,
-                fontWeight: "500",
-                color: "#0F172A",
-              }}
-            >
-              Hỗ trợ
-            </Text>
-            <MaterialIcons name="chevron-right" size={24} color="#6B7280" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Logout Button */}
-        <TouchableOpacity
-          style={{
-            marginHorizontal: 20,
-            backgroundColor: "#FEF2F2",
-            borderRadius: 20,
-            paddingHorizontal: 16,
-            paddingVertical: 14,
-            flexDirection: "row",
-            alignItems: "center",
-            marginBottom: 32,
-          }}
-          onPress={() => {
-            authService.logout();
-            router.replace("/auth/login");
-          }}
-        >
-          <View
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 12,
-              backgroundColor: "#FCA5A5",
-              justifyContent: "center",
-              alignItems: "center",
-              marginRight: 12,
-            }}
-          >
-            <MaterialCommunityIcons name="logout" size={22} color="#BA1A1A" />
-          </View>
-          <Text style={{ fontSize: 16, fontWeight: "700", color: "#BA1A1A" }}>
-            Đăng xuất
-          </Text>
-        </TouchableOpacity>
-
-        {/* Footer Info */}
-        <View style={{ alignItems: "center", paddingBottom: 16 }}>
-          <Text
-            style={{
-              fontSize: 10,
-              fontWeight: "700",
-              color: "#9CA3AF",
-              letterSpacing: 2,
-            }}
-          >
-            EASYSPLIT V2.4.0
-          </Text>
-          {/* Pagination Dots */}
-          <View style={{ flexDirection: "row", gap: 6, marginTop: 8 }}>
-            <View
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: 4,
-                backgroundColor: "#16A34A",
-              }}
-            />
-            <View
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: 4,
-                backgroundColor: "#D1D5DB",
-              }}
-            />
-            <View
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: 4,
-                backgroundColor: "#D1D5DB",
-              }}
-            />
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Tài khoản</Text>
+          <View style={styles.menuCard}>
+            <MenuItem icon="lock-outline" label="Đổi mật khẩu" onPress={() => router.push("/auth/forgot-password")} />
+            <MenuItem icon="logout" label="Đăng xuất" onPress={() => router.replace("/auth/login")} danger />
           </View>
         </View>
       </ScrollView>
     </View>
   );
-};
+}
 
-export default ProfileScreen;
+const StatCard = ({ label, value }: { label: string; value: number }) => (
+  <View style={styles.statCard}>
+    <Text style={styles.statValue}>{value}</Text>
+    <Text style={styles.statLabel}>{label}</Text>
+  </View>
+);
+
+const Input = ({ value, placeholder, onChangeText }: { value: string; placeholder: string; onChangeText: (value: string) => void }) => (
+  <TextInput
+    value={value}
+    onChangeText={onChangeText}
+    placeholder={placeholder}
+    placeholderTextColor="#9CA3AF"
+    style={styles.input}
+  />
+);
+
+const MenuItem = ({ icon, label, onPress, danger = false }: { icon: keyof typeof MaterialIcons.glyphMap; label: string; onPress: () => void; danger?: boolean }) => (
+  <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={styles.menuItem}>
+    <MaterialIcons name={icon} size={22} color={danger ? "#BA1A1A" : "#16A34A"} />
+    <Text style={[styles.menuText, danger && { color: "#BA1A1A" }]}>{label}</Text>
+    <MaterialIcons name="chevron-right" size={22} color="#6B7280" />
+  </TouchableOpacity>
+);
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: "#F4F7F4" },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loadingText: { marginTop: 12, color: "#6B7280" },
+  content: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24, gap: 16 },
+  heroCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 28,
+    padding: 20,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    elevation: 3,
+  },
+  avatarWrap: { position: "relative", marginBottom: 14 },
+  avatar: { width: 120, height: 120, borderRadius: 60, borderWidth: 4, borderColor: "#16A34A" },
+  avatarBadge: {
+    position: "absolute",
+    right: 0,
+    bottom: 0,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#16A34A",
+    borderWidth: 3,
+    borderColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  nameText: { fontSize: 22, fontWeight: "800", color: "#0F172A" },
+  emailText: { marginTop: 4, color: "#6B7280" },
+  phoneText: { marginTop: 4, color: "#6B7280" },
+  statsRow: { flexDirection: "row", gap: 10, marginTop: 18, width: "100%" },
+  statCard: {
+    flex: 1,
+    backgroundColor: "#F7F9F7",
+    borderRadius: 18,
+    paddingVertical: 14,
+    alignItems: "center",
+    gap: 4,
+  },
+  statValue: { fontSize: 18, fontWeight: "800", color: "#0F172A" },
+  statLabel: { fontSize: 12, color: "#6B7280" },
+  section: { gap: 12 },
+  sectionTitle: { fontSize: 16, fontWeight: "700", color: "#0F172A" },
+  formCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 16,
+    gap: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  input: {
+    backgroundColor: "#F7F9F7",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
+  },
+  buttonRow: { flexDirection: "row", gap: 10 },
+  secondaryButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingVertical: 12,
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+  },
+  secondaryButtonText: { fontWeight: "700", color: "#0F172A" },
+  primaryButton: {
+    flex: 1,
+    borderRadius: 16,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  primaryButtonText: { fontWeight: "700", color: "#FFFFFF" },
+  infoCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  infoTitle: { fontSize: 15, fontWeight: "800", color: "#0F172A" },
+  infoText: { marginTop: 4, color: "#6B7280" },
+  menuCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  menuText: { flex: 1, fontSize: 15, fontWeight: "700", color: "#0F172A" },
+});
