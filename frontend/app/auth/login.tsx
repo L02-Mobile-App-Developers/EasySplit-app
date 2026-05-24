@@ -3,6 +3,7 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -16,19 +17,20 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/ThemedText";
 import { useAppTheme } from "@/hooks/useAppTheme";
-
 import { useAuth } from "@/hooks/useAuth";
-import { Alert } from "react-native";
 
 export default function Login() {
-  const { textColor, backgroundWhite, selected } = useAppTheme();
+  const { textColor, backgroundWhite, selected, lightGray } = useAppTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const brandGreen = selected;
-  const placeholderGray = "#9CA3AF";
-
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
+
+  const brandGreen = selected;
+  const placeholderGray = "#6B7280";
+  const surface = "#FFFFFF";
+  const surfaceVariant = "#F7F9F7";
+  const outline = lightGray;
 
   return (
     <SafeAreaView
@@ -36,6 +38,7 @@ export default function Login() {
     >
       <StatusBar barStyle="dark-content" />
       <KeyboardAvoidingView behavior="padding" style={styles.flex}>
+        <View style={styles.topBand} />
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
@@ -47,37 +50,47 @@ export default function Login() {
               style={styles.logo}
               contentFit="contain"
             />
+            <ThemedText style={[styles.brandLabel, { color: placeholderGray }]}>
+              EasySplit
+            </ThemedText>
           </View>
 
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: surface }]}> 
+            <View style={[styles.heroAccent, { backgroundColor: brandGreen }]} />
             <ThemedText
               fontWeight="semibold"
               style={[styles.title, { color: textColor }]}
             >
               Đăng nhập tài khoản
             </ThemedText>
-            <ThemedText style={[styles.subtitle, { color: placeholderGray }]}>
+            <ThemedText style={[styles.subtitle, { color: placeholderGray }]}> 
               Chào mừng bạn quay lại, hãy đăng nhập để tiếp tục.
             </ThemedText>
 
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Email"
-              placeholderTextColor={placeholderGray}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              style={styles.input}
-            />
+            <View style={[styles.field, { backgroundColor: surfaceVariant, borderColor: outline }]}> 
+              <Ionicons name="mail-outline" size={18} color={placeholderGray} />
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Email"
+                placeholderTextColor={placeholderGray}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                style={styles.input}
+              />
+            </View>
 
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Mật khẩu"
-              placeholderTextColor={placeholderGray}
-              secureTextEntry
-              style={styles.input}
-            />
+            <View style={[styles.field, { backgroundColor: surfaceVariant, borderColor: outline }]}> 
+              <Ionicons name="lock-closed-outline" size={18} color={placeholderGray} />
+              <TextInput
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Mật khẩu"
+                placeholderTextColor={placeholderGray}
+                secureTextEntry
+                style={styles.input}
+              />
+            </View>
 
             <TouchableOpacity
               activeOpacity={0.85}
@@ -90,19 +103,14 @@ export default function Login() {
                   }
 
                   setLoading(true);
-
                   await login(email, password);
-
                   Alert.alert("Thành công", "Đăng nhập thành công");
-
                   router.replace("/(tabs)");
                 } catch (error: any) {
                   console.log(error?.response?.data || error);
-
                   const message =
                     error?.response?.data?.error?.message ||
                     "Đăng nhập thất bại";
-
                   Alert.alert("Lỗi", message);
                 } finally {
                   setLoading(false);
@@ -184,6 +192,14 @@ export default function Login() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   flex: { flex: 1 },
+  topBand: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 220,
+    backgroundColor: "rgba(30, 142, 62, 0.08)",
+  },
   scrollContent: {
     flexGrow: 1,
     justifyContent: "center",
@@ -191,53 +207,63 @@ const styles = StyleSheet.create({
     paddingVertical: 28,
   },
   brandWrap: { alignItems: "center", marginBottom: 18 },
-  logo: { width: 220, height: 90 },
+  logo: { width: 210, height: 84 },
+  brandLabel: {
+    marginTop: 2,
+    fontSize: 13,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+  },
   card: {
     width: "100%",
-    backgroundColor: "white",
     borderRadius: 28,
     paddingHorizontal: 20,
     paddingVertical: 24,
     alignItems: "stretch",
-    elevation: 4,
+    overflow: "hidden",
+    elevation: 6,
     ...Platform.select({
       ios: {
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.08,
-        shadowRadius: 20,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.1,
+        shadowRadius: 24,
       },
     }),
   },
+  heroAccent: {
+    width: 64,
+    height: 6,
+    borderRadius: 999,
+    marginBottom: 14,
+  },
   title: { fontSize: 22, marginBottom: 6 },
   subtitle: { fontSize: 14, marginBottom: 18 },
-  mockBox: {
-    backgroundColor: "#F3F4F6",
+  field: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 4,
     borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 6,
-  },
-  mockTitle: { fontSize: 13, marginBottom: 6 },
-  mockText: { fontSize: 12, lineHeight: 18 },
-  input: {
-    backgroundColor: "#FAFBFF",
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#E8EBF5",
     marginTop: 12,
+  },
+  input: {
+    flex: 1,
+    backgroundColor: "transparent",
+    paddingVertical: 13,
     fontSize: 15,
   },
   button: {
     marginTop: 18,
-    paddingVertical: 14,
+    minHeight: 52,
     borderRadius: 16,
     alignItems: "center",
-    shadowColor: "#22C55E",
+    justifyContent: "center",
+    shadowColor: "#1E8E3E",
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.18,
     shadowRadius: 14,
     elevation: 5,
   },
@@ -250,7 +276,7 @@ const styles = StyleSheet.create({
     marginTop: 22,
     marginBottom: 16,
   },
-  divider: { flex: 1, height: 1, backgroundColor: "#EBEEF6" },
+  divider: { flex: 1, height: 1, backgroundColor: "#E7EAE7" },
   dividerText: { marginHorizontal: 12, fontSize: 12 },
   socialRow: { flexDirection: "row", justifyContent: "space-between", gap: 10 },
   socialButton: {
@@ -259,7 +285,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#EEF1F7",
+    borderColor: "#E7EAE7",
     justifyContent: "center",
     alignItems: "center",
     ...Platform.select({

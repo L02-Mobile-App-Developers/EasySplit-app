@@ -87,7 +87,10 @@ export default function NavigationBar() {
         return (
           <TouchableOpacity
             key={index}
-            style={styles.item}
+            style={[
+              styles.item,
+              isActive && { backgroundColor: "rgba(34, 197, 94, 0.08)" },
+            ]}
             onPress={() => router.push(item.route as any)}
           >
             <View
@@ -122,16 +125,24 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     justifyContent: "space-around",
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 10,
-    gap: 20,
+    gap: 12,
     width: "100%",
     borderTopWidth: 1,
     borderTopColor: "#E5E7EB",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 12,
   },
   item: {
     alignItems: "center",
     position: "relative",
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 18,
   },
   label: {
     fontSize: 12,
@@ -139,8 +150,8 @@ const styles = StyleSheet.create({
   },
   activeBorder: {
     position: "absolute",
-    top: -12,
-    height: 2,
-    borderRadius: 2,
+    top: -10,
+    height: 3,
+    borderRadius: 999,
   },
 });

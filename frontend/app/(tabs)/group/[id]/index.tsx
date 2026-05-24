@@ -1,13 +1,7 @@
 import TopAppBar from "@/components/TopAppBar";
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import {
-  Image,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View
-} from "react-native";
+import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 import { expenseService } from "@/api/services/expense.service";
 import { groupService } from "@/api/services/group.service";
