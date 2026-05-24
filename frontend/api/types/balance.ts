@@ -1,11 +1,9 @@
 import type { User } from "./auth";
 
 export interface Balance {
-  groupId: string;
-
-  userId: string;
-
+  id: string;
   balance: number;
-
+  groupId: string;
+  userId: string;
   user: User | null;
 }

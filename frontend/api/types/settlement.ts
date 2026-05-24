@@ -1,12 +1,11 @@
-import type { PublicUser } from "./user";
+import type { User } from "./auth";
 
 export interface DebtEdge {
   fromUserId: string;
   toUserId: string;
   amount: number;
-
-  fromUser: PublicUser | null;
-  toUser: PublicUser | null;
+  fromUser: User | null;
+  toUser: User | null;
 }
 
 export interface Settlement {
@@ -22,9 +21,9 @@ export interface Settlement {
   createdBy: string;
   createdAt: string;
 
-  fromUser: PublicUser | null;
-  toUser: PublicUser | null;
-  creator: PublicUser | null;
+  fromUser: User | null;
+  toUser: User | null;
+  creator: User | null;
 }
 
 export interface SmartSettleTransfer {

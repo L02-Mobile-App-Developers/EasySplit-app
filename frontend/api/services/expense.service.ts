@@ -1,25 +1,82 @@
+import { v4 as uuidv4 } from "uuid";
+
 import { apiClient } from "../client";
 import { ENDPOINTS } from "../endpoints";
 
-import type { CreateExpenseInput, Expense } from "../types/expense";
+import type {
+  CreateExpenseRequest,
+  Expense,
+  UpdateExpenseRequest,
+} from "../types/expense";
 
-import type { ApiSuccessResponse } from "../types/response";
+import type {
+  ApiPaginatedResponse,
+  ApiSuccessResponse,
+} from "../types/response";
 
 export const expenseService = {
-  async getExpenses(groupId: string) {
-    const response = await apiClient.get<ApiSuccessResponse<Expense[]>>(
+  // POST /groups/:groupId/expenses
+  async createExpense(groupId: string, payload: CreateExpenseRequest) {
+    const response = await apiClient.post<ApiSuccessResponse<Expense>>(
       ENDPOINTS.GROUPS.EXPENSES(groupId),
+      payload,
+      {
+        headers: {
+          "Idempotency-Key": uuidv4(),
+        },
+      },
     );
 
     return response.data.data;
   },
 
-  async createExpense(groupId: string, payload: CreateExpenseInput) {
-    const response = await apiClient.post<ApiSuccessResponse<Expense>>(
+  // GET /groups/:groupId/expenses
+  async getExpenses(groupId: string, page: number = 1, limit: number = 20) {
+    const response = await apiClient.get<ApiPaginatedResponse<Expense[]>>(
       ENDPOINTS.GROUPS.EXPENSES(groupId),
+      {
+        params: {
+          page,
+          limit,
+        },
+      },
+    );
+
+    return {
+      items: response.data.data,
+      pagination: response.data.pagination,
+    };
+  },
+
+  // GET /groups/:groupId/expenses/:expenseId
+  async getExpense(groupId: string, expenseId: string) {
+    const response = await apiClient.get<ApiSuccessResponse<Expense>>(
+      ENDPOINTS.GROUPS.EXPENSE_DETAIL(groupId, expenseId),
+    );
+
+    return response.data.data;
+  },
+
+  // PATCH /groups/:groupId/expenses/:expenseId
+  async updateExpense(
+    groupId: string,
+    expenseId: string,
+    payload: UpdateExpenseRequest,
+  ) {
+    const response = await apiClient.patch<ApiSuccessResponse<Expense>>(
+      ENDPOINTS.GROUPS.EXPENSE_DETAIL(groupId, expenseId),
       payload,
     );
 
     return response.data.data;
+  },
+
+  // DELETE /groups/:groupId/expenses/:expenseId
+  async deleteExpense(groupId: string, expenseId: string) {
+    const response = await apiClient.delete<ApiSuccessResponse<{ id: string }>>(
+      ENDPOINTS.GROUPS.EXPENSE_DETAIL(groupId, expenseId),
+    );
+
+    return response.data.data; // return deleted expense id
   },
 };

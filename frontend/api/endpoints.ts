@@ -14,9 +14,9 @@ export const ENDPOINTS = {
 
   ME: {
     // ok
-    PROFILE: "/me",
-    SUBSCRIPTION: "/me/subscription",
-    USAGE: "/me/usage",
+    PROFILE: "/me", // get, patch
+    SUBSCRIPTION: "/me/subscription", // get
+    USAGE: "/me/usage", // get
   },
 
   GROUPS: {
@@ -31,35 +31,48 @@ export const ENDPOINTS = {
     MEMBER_DETAIL: (groupId: string, userId: string) =>
       `/groups/${groupId}/members/${userId}`, // patch, delete
 
+    DELETE: (groupId: string, userId: string) =>
+      `/groups/${groupId}/members/${userId}`, // delete
+
+    // Expenses
+
     EXPENSES: (groupId: string) => `/groups/${groupId}/expenses`,
 
     EXPENSE_DETAIL: (groupId: string, expenseId: string) =>
       `/groups/${groupId}/expenses/${expenseId}`,
 
+    // Balance
+
     BALANCES: (groupId: string) => `/groups/${groupId}/balances`, // ok
 
     MY_BALANCE: (groupId: string) => `/groups/${groupId}/balances/me`, // ok
 
-    DEBTS: (groupId: string) => `/groups/${groupId}/debts`,
+    // Settlement
+
+    DEBTS: (groupId: string) => `/groups/${groupId}/debts`, // get
 
     SMART_SETTLE: (groupId: string) =>
-      `/groups/${groupId}/smart-settle/suggestions`,
+      `/groups/${groupId}/smart-settle/suggestions`, // post
 
-    SETTLEMENTS: (groupId: string) => `/groups/${groupId}/settlements`,
+    SETTLEMENTS: (groupId: string) => `/groups/${groupId}/settlements`, // get, post
 
     SETTLEMENT_DETAIL: (groupId: string, settlementId: string) =>
-      `/groups/${groupId}/settlements/${settlementId}`,
+      `/groups/${groupId}/settlements/${settlementId}`, // get
 
     GROUP_SETTLEMENT: (groupId: string) =>
-      `/groups/${groupId}/group-settlement`,
+      `/groups/${groupId}/group-settlement`, // post
 
-    REMINDERS: (groupId: string) => `/groups/${groupId}/reminders`,
+    // reminder
+
+    REMINDERS: (groupId: string) => `/groups/${groupId}/reminders`, // get, post
 
     CANCEL_REMINDER: (groupId: string, reminderId: string) =>
-      `/groups/${groupId}/reminders/${reminderId}/cancel`,
+      `/groups/${groupId}/reminders/${reminderId}/cancel`, // post
 
-    ACTIVITIES: (groupId: string) => `/groups/${groupId}/activities`, // ok
+    // Activity
 
-    HISTORY: (groupId: string) => `/groups/${groupId}/history`, // ok
+    ACTIVITIES: (groupId: string) => `/groups/${groupId}/activities`, // get
+
+    HISTORY: (groupId: string) => `/groups/${groupId}/history`, // get
   },
 };

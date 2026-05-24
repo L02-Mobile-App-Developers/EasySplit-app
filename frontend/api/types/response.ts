@@ -1,22 +1,17 @@
 export interface ApiErrorDetail {
   field?: string;
-
   issue?: string;
 }
 
 export interface ApiError {
   code: string;
-
   message: string;
-
   details?: ApiErrorDetail[];
 }
 
 export interface ApiSuccessResponse<T> {
   data: T;
-
   message: string;
-
   meta?: any;
 }
 

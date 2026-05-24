@@ -15,6 +15,7 @@ import type {
 } from "../types/response";
 
 export const settlementService = {
+  // GET /groups/:groupId/debts
   async getDebts(groupId: string) {
     const response = await apiClient.get<ApiSuccessResponse<DebtEdge[]>>(
       ENDPOINTS.GROUPS.DEBTS(groupId),
@@ -23,6 +24,7 @@ export const settlementService = {
     return response.data.data;
   },
 
+  // POST /groups/:groupId/smart-settle/suggestions
   async generateSmartSettle(
     groupId: string,
     payload?: {
@@ -40,6 +42,7 @@ export const settlementService = {
     return response.data.data;
   },
 
+  // POST /groups/:groupId/settlements
   async createSettlement(groupId: string, payload: CreateSettlementRequest) {
     const response = await apiClient.post<ApiSuccessResponse<Settlement>>(
       ENDPOINTS.GROUPS.SETTLEMENTS(groupId),
@@ -54,6 +57,7 @@ export const settlementService = {
     return response.data.data;
   },
 
+  // GET /groups/:groupId/settlements
   async getSettlements(groupId: string, page: number = 1, limit: number = 20) {
     const response = await apiClient.get<ApiPaginatedResponse<Settlement[]>>(
       ENDPOINTS.GROUPS.SETTLEMENTS(groupId),
@@ -71,6 +75,7 @@ export const settlementService = {
     };
   },
 
+  // GET /groups/:groupId/settlements/:settlementId
   async getSettlement(groupId: string, settlementId: string) {
     const response = await apiClient.get<ApiSuccessResponse<Settlement>>(
       ENDPOINTS.GROUPS.SETTLEMENT_DETAIL(groupId, settlementId),
@@ -79,6 +84,7 @@ export const settlementService = {
     return response.data.data;
   },
 
+  // POST /groups/:groupId/group-settlement
   async groupSettlement(
     groupId: string,
     payload: {
