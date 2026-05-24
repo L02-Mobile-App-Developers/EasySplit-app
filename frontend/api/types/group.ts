@@ -12,6 +12,21 @@ export interface Group {
   updatedAt: string;
 }
 
+export interface GroupMember {
+  userId: string;
+  displayName: string;
+  email: string;
+  avatarUrl: string | null;
+  role: "owner" | "admin" | "member";
+  joinedAt: string;
+}
+
+export interface GroupMemberSuccess {
+  userId: string;
+  role: "admin" | "member";
+  joinedAt: string;
+}
+
 export interface CreateGroupRequest {
   name: string;
   category: GroupCategory;

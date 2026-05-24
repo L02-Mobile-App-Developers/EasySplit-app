@@ -6,6 +6,7 @@ import { tokenStorage } from "@/api/storage/token.storage";
 
 import type { User } from "@/api/types/auth";
 
+
 interface AuthStore {
   user: User | null;
 

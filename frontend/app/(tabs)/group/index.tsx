@@ -14,6 +14,7 @@ import {
 
 import { router } from "expo-router";
 
+import { activityService } from "@/api/services/activity.service";
 import { groupService } from "@/api/services/group.service";
 
 import type { Group } from "@/api/types/group";
@@ -89,6 +90,8 @@ export default function Index() {
 
   const [groups, setGroups] = useState<Group[]>([]);
 
+  const [activitiesMap, setActivitiesMap] = useState<Record<string, any>>({});
+
   const [loading, setLoading] = useState(true);
 
   const [refreshing, setRefreshing] = useState(false);
@@ -121,6 +124,34 @@ export default function Index() {
   useEffect(() => {
     fetchGroups();
   }, []);
+
+  // fetch activities for each group to show recent activity
+  useEffect(() => {
+    if (groups.length === 0) return;
+
+    const fetchActivities = async () => {
+      try {
+        const results = await Promise.all(
+          groups.map(async (group) => {
+            const data = await activityService.getActivities(group.id);
+            return { groupId: group.id, data };
+          }),
+        );
+
+        const map: Record<string, any> = {};
+
+        results.forEach((r: any) => {
+          map[r.groupId] = r.data.items?.[0] ?? null; // lấy latest activity
+        });
+
+        setActivitiesMap(map);
+      } catch (err) {
+        console.log("Get activities error:", err);
+      }
+    };
+
+    fetchActivities();
+  }, [groups]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -265,7 +296,6 @@ export default function Index() {
             </TouchableOpacity>
           ))}
         </ScrollView>
-        {/* </View> */}
 
         {/* Group List */}
         {filteredGroups.map((item) => (
@@ -412,10 +442,10 @@ export default function Index() {
                         marginBottom: 12,
                       }}
                     >
-                      {item.createdAt}
+                      {activitiesMap[item.id]?.createdAt ?? ""}
                     </Text>
                     <Text style={{ fontSize: 14, color: textColor }}>
-                      {groupList[0].recentActivity.description}
+                      {activitiesMap[item.id]?.action ?? "Chưa có hoạt động"}
                     </Text>
                   </View>
                 </View>
