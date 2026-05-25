@@ -3,36 +3,37 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
+import { meService } from "@/api/services/me.service";
+import type { User } from "@/api/types/auth";
+import type { Usage } from "@/api/types/me";
+import { useAuthStore } from "@/store/auth.store";
 import TopAppBar from "@/components/TopAppBar";
 
-const mockProfileData = {
-  name: "Minh Nguyen",
-  email: "minh@gmail.com",
-  phone: "090xxxxxxx",
-  groups: 12,
-  friends: 48,
-  transactions: 156,
-  avatar: require("../../../assets/images/icon.png"),
+const fallbackAvatar = require("../../../assets/images/icon.png");
+
+type ProfileData = {
+  user: User;
+  usage: Usage;
 };
-
-const fetchProfileData = () =>
-  new Promise((resolve) => setTimeout(() => resolve(mockProfileData), 700));
-
-type ProfileData = typeof mockProfileData;
 
 export default function ProfileScreen() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [draft, setDraft] = useState<ProfileData | null>(null);
+  const [draft, setDraft] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     const loadProfile = async () => {
       setLoading(true);
-      const data = (await fetchProfileData()) as ProfileData;
-      setProfile(data);
-      setDraft(data);
-      setLoading(false);
+      try {
+        const [user, usage] = await Promise.all([meService.getProfile(), meService.getUsage()]);
+
+        setProfile({ user, usage });
+        setDraft(user);
+        useAuthStore.setState({ user, isAuthenticated: true });
+      } finally {
+        setLoading(false);
+      }
     };
 
     loadProfile();
@@ -40,20 +41,34 @@ export default function ProfileScreen() {
 
   const beginEditing = () => {
     if (!profile) return;
-    setDraft(profile);
+    setDraft(profile.user);
     setIsEditing(true);
   };
 
   const cancelEditing = () => {
     if (!profile) return;
-    setDraft(profile);
+    setDraft(profile.user);
     setIsEditing(false);
   };
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
     if (!draft) return;
-    setProfile(draft);
-    setIsEditing(false);
+
+    setLoading(true);
+
+    try {
+      const updatedUser = await meService.updateProfile({
+        displayName: draft.displayName,
+        avatarUrl: draft.avatarUrl,
+      });
+
+      setProfile((current) => (current ? { ...current, user: updatedUser } : current));
+      setDraft(updatedUser);
+      useAuthStore.setState({ user: updatedUser, isAuthenticated: true });
+      setIsEditing(false);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) {
@@ -86,20 +101,22 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.heroCard}>
           <View style={styles.avatarWrap}>
-            <Image source={draft?.avatar || profile.avatar} style={styles.avatar} />
+            <Image
+              source={profile.user.avatarUrl ? { uri: profile.user.avatarUrl } : fallbackAvatar}
+              style={styles.avatar}
+            />
             <View style={styles.avatarBadge}>
               <MaterialIcons name={isEditing ? "photo-library" : "edit"} size={18} color="#fff" />
             </View>
           </View>
 
-          <Text style={styles.nameText}>{draft?.name ?? profile.name}</Text>
-          <Text style={styles.emailText}>{draft?.email ?? profile.email}</Text>
-          <Text style={styles.phoneText}>{draft?.phone ?? profile.phone}</Text>
+          <Text style={styles.nameText}>{draft?.displayName ?? profile.user.displayName}</Text>
+          <Text style={styles.emailText}>{profile.user.email ?? "Chưa có email"}</Text>
 
           <View style={styles.statsRow}>
-            <StatCard label="Nhóm" value={profile.groups} />
-            <StatCard label="Bạn bè" value={profile.friends} />
-            <StatCard label="Giao dịch" value={profile.transactions} />
+            <StatCard label="Nhóm" value={profile.usage.groupCount} />
+            <StatCard label="Smart settle" value={profile.usage.smartSettleUsedThisMonth} />
+            <StatCard label="Quota" value={profile.usage.freeMaxGroups} />
           </View>
         </View>
 
@@ -107,9 +124,16 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Thông tin cá nhân</Text>
           {isEditing ? (
             <View style={styles.formCard}>
-              <Input value={draft?.name ?? ""} placeholder="Họ và tên" onChangeText={(value) => setDraft((current) => (current ? { ...current, name: value } : current))} />
-              <Input value={draft?.email ?? ""} placeholder="Email" onChangeText={(value) => setDraft((current) => (current ? { ...current, email: value } : current))} />
-              <Input value={draft?.phone ?? ""} placeholder="Số điện thoại" onChangeText={(value) => setDraft((current) => (current ? { ...current, phone: value } : current))} />
+              <Input
+                value={draft?.displayName ?? ""}
+                placeholder="Họ và tên"
+                onChangeText={(value) => setDraft((current) => (current ? { ...current, displayName: value } : current))}
+              />
+              <Input
+                value={draft?.avatarUrl ?? ""}
+                placeholder="Avatar URL"
+                onChangeText={(value) => setDraft((current) => (current ? { ...current, avatarUrl: value } : current))}
+              />
               <View style={styles.buttonRow}>
                 <TouchableOpacity style={[styles.secondaryButton, { borderColor: "#E5E7EB" }]} onPress={cancelEditing}>
                   <Text style={styles.secondaryButtonText}>Hủy</Text>
@@ -124,7 +148,7 @@ export default function ProfileScreen() {
               <MaterialIcons name="account-circle" size={24} color="#16A34A" />
               <View style={{ flex: 1 }}>
                 <Text style={styles.infoTitle}>Cập nhật hồ sơ</Text>
-                <Text style={styles.infoText}>Chỉnh sửa tên, email và số điện thoại của bạn.</Text>
+                <Text style={styles.infoText}>Chỉnh sửa tên hiển thị và avatar của bạn.</Text>
               </View>
               <MaterialIcons name="chevron-right" size={24} color="#6B7280" />
             </TouchableOpacity>
@@ -201,7 +225,6 @@ const styles = StyleSheet.create({
   },
   nameText: { fontSize: 22, fontWeight: "800", color: "#0F172A" },
   emailText: { marginTop: 4, color: "#6B7280" },
-  phoneText: { marginTop: 4, color: "#6B7280" },
   statsRow: { flexDirection: "row", gap: 10, marginTop: 18, width: "100%" },
   statCard: {
     flex: 1,
