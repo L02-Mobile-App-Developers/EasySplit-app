@@ -26,6 +26,7 @@ export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const brandGreen = selected;
   const placeholderGray = "#6B7280";
   const surface = "#FFFFFF";
@@ -40,26 +41,44 @@ export default function Register() {
     router.replace("/auth/login");
   };
 
-  const handleRegister = () => {
-    if (!name || !email || !password) {
-      Alert.alert("Lỗi", "Vui lòng điền đầy đủ các trường bắt buộc");
+  const handleRegister = async () => {
+    setSubmitError(null);
+
+    if (!name.trim() || !email.trim() || !password) {
+      const message = "Vui lòng điền đầy đủ các trường bắt buộc";
+      setSubmitError(message);
+      Alert.alert("Lỗi", message);
       return;
     }
     if (password !== confirm) {
-      Alert.alert("Lỗi", "Mật khẩu xác nhận không khớp");
+      const message = "Mật khẩu xác nhận không khớp";
+      setSubmitError(message);
+      Alert.alert("Lỗi", message);
       return;
     }
 
-    authService
-      .register({ displayName: name, email, password })
-      .then(() => {
-        Alert.alert("Thành công", `Đã tạo tài khoản cho ${name}`);
-        router.replace("/auth/login");
-      })
-      .catch((error) => {
-        console.error("Đăng ký thất bại:", error);
-        Alert.alert("Lỗi", "Đăng ký thất bại. Vui lòng thử lại.");
-      });
+    try {
+      await authService.register({ displayName: name.trim(), email: email.trim(), password });
+      setSubmitError(null);
+      Alert.alert("Thành công", `Đã tạo tài khoản cho ${name.trim()}`);
+      router.replace("/auth/login");
+    } catch (error: any) {
+      console.error("Đăng ký thất bại:", error);
+
+      const errorCode = error?.response?.data?.error?.code;
+      const errorMessage = error?.response?.data?.error?.message;
+
+      if (errorCode === "CONFLICT" || /already registered|already exists/i.test(String(errorMessage ?? ""))) {
+        const message = "Email này đã được đăng ký. Vui lòng dùng email khác hoặc đăng nhập nếu bạn đã có tài khoản.";
+        setSubmitError(message);
+        Alert.alert("Email đã tồn tại", message);
+        return;
+      }
+
+      const message = "Đăng ký thất bại. Vui lòng thử lại.";
+      setSubmitError(message);
+      Alert.alert("Lỗi", message);
+    }
   };
 
   return (
@@ -110,6 +129,12 @@ export default function Register() {
             >
               Tạo tài khoản để bắt đầu.
             </ThemedText>
+
+            {submitError ? (
+              <View style={styles.errorBox}>
+                <ThemedText style={styles.errorText}>{submitError}</ThemedText>
+              </View>
+            ) : null}
 
             <View style={[styles.field, { backgroundColor: surfaceVariant, borderColor: outline }]}> 
               <Ionicons name="person-outline" size={18} color={placeholderGray} />
@@ -255,6 +280,18 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 22, marginBottom: 6 },
   subtitle: { fontSize: 14, marginBottom: 18 },
+  errorBox: {
+    backgroundColor: "#FFF1F1",
+    borderColor: "#F6C7C7",
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 14,
+  },
+  errorText: {
+    color: "#BA1A1A",
+  },
   field: {
     flexDirection: "row",
     alignItems: "center",

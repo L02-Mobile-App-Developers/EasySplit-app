@@ -1,55 +1,27 @@
 import { AntDesign, MaterialIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 
+import { activityService } from "@/api/services/activity.service";
+import { balanceService } from "@/api/services/balance.service";
+import { groupService } from "@/api/services/group.service";
+import type { Group } from "@/api/types/group";
 import TopAppBar from "@/components/TopAppBar";
 import { ThemedText } from "@/components/ThemedText";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
-const money = 123456789;
+type HomeActivity = {
+  id: string;
+  image: any;
+  description: string;
+  time: string;
+  money: number;
+  type: "received" | "paid";
+};
 
-const recentActivities = [
-  {
-    id: 1,
-    image: require("../../assets/images/icon.png"),
-    description: "A đã thanh toán cho Trà sữa",
-    time: "2 giờ trước",
-    money: 50000,
-    type: "received",
-  },
-  {
-    id: 2,
-    image: require("../../assets/images/icon.png"),
-    description: "B đã thanh toán cho Ăn tối",
-    time: "4 giờ trước",
-    money: 120000,
-    type: "received",
-  },
-  {
-    id: 3,
-    image: require("../../assets/images/icon.png"),
-    description: "Cần chia tiền vé xe",
-    time: "1 ngày trước",
-    money: 98000,
-    type: "paid",
-  },
-];
-
-const recentGroups = [
-  {
-    id: 1,
-    name: "Du lịch Đà Lạt",
-    members: 4,
-    status: "Đang cân bằng",
-  },
-  {
-    id: 2,
-    name: "Ăn uống phòng trọ",
-    members: 4,
-    status: "Đang cân bằng",
-  },
-];
+type HomeGroup = Pick<Group, "id" | "name" | "memberCount" | "status">;
 
 const quickActions = [
   {
@@ -68,6 +40,77 @@ const quickActions = [
 
 export default function Index() {
   const { textColor, selected, successGreen, errorRed } = useAppTheme();
+  const [groups, setGroups] = useState<HomeGroup[]>([]);
+  const [recentActivities, setRecentActivities] = useState<HomeActivity[]>([]);
+  const [netBalance, setNetBalance] = useState(0);
+  const [owedBalance, setOwedBalance] = useState(0);
+  const [receivableBalance, setReceivableBalance] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadHome = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const groupList = await groupService.getGroups();
+        const scopedGroups = groupList.slice(0, 2) as HomeGroup[];
+
+        setGroups(scopedGroups);
+
+        if (scopedGroups.length === 0) {
+          setRecentActivities([]);
+          setNetBalance(0);
+          setOwedBalance(0);
+          setReceivableBalance(0);
+          return;
+        }
+
+        const results = await Promise.all(
+          scopedGroups.map(async (group) => {
+            const [myBalance, activities] = await Promise.all([
+              balanceService.getMyBalance(group.id),
+              activityService.getActivities(group.id, { page: 1, limit: 1 }),
+            ]);
+
+            return {
+              group,
+              myBalance,
+              latestActivity: activities.items?.[0] ?? null,
+            };
+          }),
+        );
+
+        const balances = results.map((item) => item.myBalance.balance ?? 0);
+        setNetBalance(balances.reduce((sum, current) => sum + current, 0));
+        setReceivableBalance(balances.filter((value) => value > 0).reduce((sum, current) => sum + current, 0));
+        setOwedBalance(Math.abs(balances.filter((value) => value < 0).reduce((sum, current) => sum + current, 0)));
+
+        const activities = results
+          .filter((item) => Boolean(item.latestActivity))
+          .map((item) => mapHomeActivity(item.group, item.latestActivity));
+
+        setRecentActivities(
+          activities.sort((left, right) => right.sortKey - left.sortKey).slice(0, 3),
+        );
+      } catch (fetchError) {
+        console.log("Get home data error:", fetchError);
+        setError("Không thể tải dữ liệu trang chủ.");
+        setGroups([]);
+        setRecentActivities([]);
+        setNetBalance(0);
+        setOwedBalance(0);
+        setReceivableBalance(0);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadHome();
+  }, []);
+
+  const money = useMemo(() => Math.abs(netBalance), [netBalance]);
 
   const handleSearch = () => undefined;
 
@@ -87,25 +130,35 @@ export default function Index() {
       />
 
       <ScrollView contentContainerStyle={styles.page}>
+        {error ? (
+          <View style={styles.errorCard}>
+            <ThemedText fontWeight="semibold" style={styles.errorText}>
+              {error}
+            </ThemedText>
+          </View>
+        ) : null}
+
         <View style={styles.heroCard}>
           <View style={styles.heroBadge}>
             <ThemedText style={[styles.badgeText, { color: selected }]}>Overview</ThemedText>
           </View>
           <ThemedText fontWeight="bold" style={[styles.heroTitle, { color: textColor }]}>Tổng chênh lệch</ThemedText>
-          <ThemedText fontWeight="bold" style={[styles.heroAmount, { color: successGreen }]}>+{money.toLocaleString()} VND</ThemedText>
+          <ThemedText fontWeight="bold" style={[styles.heroAmount, { color: netBalance >= 0 ? successGreen : errorRed }]}> {netBalance >= 0 ? "+" : "-"}{money.toLocaleString()} VND</ThemedText>
           <View style={styles.heroPill}>
-            <ThemedText fontWeight="semibold" style={[styles.pillText, { color: textColor }]}>Dòng tiền dương</ThemedText>
+            <ThemedText fontWeight="semibold" style={[styles.pillText, { color: textColor }]}>
+              {netBalance >= 0 ? "Dòng tiền dương" : "Dòng tiền âm"}
+            </ThemedText>
           </View>
         </View>
 
         <View style={styles.dualRow}>
           <View style={[styles.dualCard, { backgroundColor: "#FDECEC" }]}>
             <ThemedText fontWeight="bold" style={[styles.dualLabel, { color: errorRed }]}>Bạn đang nợ</ThemedText>
-            <ThemedText fontWeight="bold" style={[styles.dualValue, { color: errorRed }]}>{money.toLocaleString()} VND</ThemedText>
+            <ThemedText fontWeight="bold" style={[styles.dualValue, { color: errorRed }]}>{owedBalance.toLocaleString()} VND</ThemedText>
           </View>
           <View style={[styles.dualCard, { backgroundColor: "#E8F7EE" }]}>
             <ThemedText fontWeight="bold" style={[styles.dualLabel, { color: successGreen }]}>Bạn được nhận</ThemedText>
-            <ThemedText fontWeight="bold" style={[styles.dualValue, { color: successGreen }]}>{money.toLocaleString()} VND</ThemedText>
+            <ThemedText fontWeight="bold" style={[styles.dualValue, { color: successGreen }]}>{receivableBalance.toLocaleString()} VND</ThemedText>
           </View>
         </View>
 
@@ -133,7 +186,13 @@ export default function Index() {
           </View>
 
           <View style={styles.cardGrid}>
-            {recentGroups.map((item) => (
+            {groups.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <ThemedText style={styles.emptyText}>Chưa có nhóm nào.</ThemedText>
+              </View>
+            ) : null}
+
+            {groups.map((item) => (
               <View key={item.id} style={styles.groupCard}>
                 <View style={styles.groupIconWrap}>
                   <MaterialIcons name="tour" size={24} color="#1E8E3E" />
@@ -141,8 +200,8 @@ export default function Index() {
                 <ThemedText numberOfLines={1} ellipsizeMode="tail" fontWeight="bold" style={styles.groupName}>
                   {item.name}
                 </ThemedText>
-                <ThemedText style={styles.groupMembers}>{item.members} thành viên</ThemedText>
-                <ThemedText style={styles.groupStatus}>{item.status}</ThemedText>
+                <ThemedText style={styles.groupMembers}>{item.memberCount} thành viên</ThemedText>
+                <ThemedText style={styles.groupStatus}>{item.status === "closed" ? "Đã quyết toán" : "Đang hoạt động"}</ThemedText>
               </View>
             ))}
           </View>
@@ -150,6 +209,12 @@ export default function Index() {
 
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Hoạt động gần đây</ThemedText>
+          {recentActivities.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <ThemedText style={styles.emptyText}>Chưa có hoạt động gần đây.</ThemedText>
+            </View>
+          ) : null}
+
           {recentActivities.map((item) => (
             <View key={item.id} style={styles.activityCard}>
               <Image source={item.image} style={styles.activityAvatar} />
@@ -173,6 +238,40 @@ export default function Index() {
       </ScrollView>
     </>
   );
+}
+
+function mapHomeActivity(group: HomeGroup, activity: any) {
+  const description = activity.description ?? activity.title ?? activity.action ?? `${group.name} có hoạt động mới`;
+  const createdAt = activity.createdAt ?? activity.time ?? new Date().toISOString();
+  const money = typeof activity.amount === "number" ? activity.amount : typeof activity.money === "number" ? activity.money : 0;
+  const type = money >= 0 ? "received" : "paid";
+
+  return {
+    id: String(activity.id ?? `${group.id}-${createdAt}`),
+    image: require("../../assets/images/icon.png"),
+    description,
+    time: formatRelativeTime(createdAt),
+    money: Math.abs(money),
+    type,
+    sortKey: new Date(createdAt).getTime(),
+  };
+}
+
+function formatRelativeTime(value: string) {
+  const date = new Date(value);
+  const diffMs = Date.now() - date.getTime();
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (Number.isNaN(date.getTime())) return "Vừa xong";
+  if (diffHours < 1) return "Vừa xong";
+  if (diffHours < 24) return `${diffHours} giờ trước`;
+  if (diffDays < 7) return `${diffDays} ngày trước`;
+
+  return new Intl.DateTimeFormat("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+  }).format(date);
 }
 
 const styles = StyleSheet.create({
@@ -244,6 +343,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
   },
+  errorCard: {
+    backgroundColor: "#FFF1F1",
+    borderRadius: 18,
+    padding: 14,
+  },
+  errorText: {
+    color: "#BA1A1A",
+  },
   quickGrid: {
     flexDirection: "row",
     gap: 12,
@@ -293,6 +400,15 @@ const styles = StyleSheet.create({
   groupStatus: {
     marginTop: 12,
     color: "#5F6368",
+  },
+  emptyCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 16,
+    alignItems: "center",
+  },
+  emptyText: {
+    color: "#6B7280",
   },
   sectionHeaderRow: {
     flexDirection: "row",
