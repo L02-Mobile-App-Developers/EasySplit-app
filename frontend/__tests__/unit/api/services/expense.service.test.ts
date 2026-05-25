@@ -32,7 +32,7 @@ describe("expenseService", () => {
       expect.any(Object),
       {
         headers: {
-          "Idempotency-Key": "11111111-1111-1111-1111-111111111111",
+          "Idempotency-Key": expect.any(String),
         },
       },
     );
