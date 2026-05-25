@@ -45,3 +45,5 @@ app-example
 coverage/**/*
 
 .env
+
+google-services.json

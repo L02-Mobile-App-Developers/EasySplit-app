@@ -11,12 +11,12 @@ import {
   View,
 } from "react-native";
 
+import { groupService } from "@/api/services/group.service";
+import type { Group } from "@/api/types/group";
 import TopAppBar from "@/components/TopAppBar";
 import { useAppTheme } from "@/hooks/useAppTheme";
-import { groupService } from "@/api/services/group.service";
 import { useTabCacheRefresh } from "@/hooks/useTabCacheRefresh";
 import { useGroupStore } from "@/store/group.store";
-import type { Group } from "@/api/types/group";
 
 const statusFilters = [
   { id: 10, name: "Tất cả" },
@@ -34,7 +34,16 @@ export default function GroupScreen() {
   const getGroupListCacheEntry = useGroupStore((s) => s.getGroupListCacheEntry);
   const setGroupListCache = useGroupStore((s) => s.setGroupListCache);
 
-  const { lightGray, tabIconDefault, backgroundWhite, textColor, successGreen, errorRed, lightGreen, darkGreen } = useAppTheme();
+  const {
+    lightGray,
+    tabIconDefault,
+    backgroundWhite,
+    textColor,
+    successGreen,
+    errorRed,
+    lightGreen,
+    darkGreen,
+  } = useAppTheme();
 
   const applyGroupListCache = useCallback((data: Group[]) => {
     setGroups(data);
@@ -50,29 +59,35 @@ export default function GroupScreen() {
     setActivitiesMap(aMap);
   }, []);
 
-  const refreshGroups = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
-    if (!silent) setLoading(true);
-    try {
-      const data = await groupService.getGroups();
-      applyGroupListCache(data as Group[]);
-      setGroupListCache(data as Group[]);
-    } catch (error) {
-      console.log("Get groups error:", error);
-    } finally {
-      if (!silent) setLoading(false);
-      setRefreshing(false);
-    }
-  }, [applyGroupListCache, setGroupListCache]);
+  const refreshGroups = useCallback(
+    async ({ silent = false }: { silent?: boolean } = {}) => {
+      if (!silent) setLoading(true);
+      try {
+        const data = await groupService.getGroups();
+        applyGroupListCache(data as Group[]);
+        setGroupListCache(data as Group[]);
+      } catch (error) {
+        console.log("Get groups error:", error);
+      } finally {
+        if (!silent) setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [applyGroupListCache, setGroupListCache],
+  );
 
   useTabCacheRefresh({
     getCacheEntry: getGroupListCacheEntry,
     applyCache: applyGroupListCache,
     refresh: refreshGroups,
+    ttlMs: 0,
   });
 
   const filteredGroups = useMemo(() => {
     return groups.filter((group) => {
-      const matchSearch = group.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchSearch = group.name
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase());
       const matchStatus =
         selectedStatus === 10
           ? true
@@ -103,7 +118,13 @@ export default function GroupScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: backgroundWhite }]}>
-      <TopAppBar title="Nhóm" showSearch showSettings onSearchPress={handleSearch} onSettingsPress={handleSettings} />
+      <TopAppBar
+        title="Nhóm"
+        showSearch
+        showSettings
+        onSearchPress={handleSearch}
+        onSettingsPress={handleSettings}
+      />
 
       <TouchableOpacity
         style={[styles.fab, { backgroundColor: darkGreen }]}
@@ -118,11 +139,15 @@ export default function GroupScreen() {
         refreshControl={undefined}
       >
         <View style={styles.headerCard}>
-          <Text style={[styles.pageTitle, { color: textColor }]}>Nhóm của bạn</Text>
-          <Text style={styles.pageSubtitle}>Quản lý chi tiêu theo từng nhóm với giao diện mới gọn và rõ hơn.</Text>
+          <Text style={[styles.pageTitle, { color: textColor }]}>
+            Nhóm của bạn
+          </Text>
+          <Text style={styles.pageSubtitle}>
+            Quản lý chi tiêu theo từng nhóm với giao diện mới gọn và rõ hơn.
+          </Text>
         </View>
 
-        <View style={[styles.searchBar, { backgroundColor: lightGray }]}> 
+        <View style={[styles.searchBar, { backgroundColor: lightGray }]}>
           <EvilIcons name="search" size={24} color={tabIconDefault} />
           <TextInput
             placeholder="Tìm kiếm nhóm..."
@@ -133,7 +158,11 @@ export default function GroupScreen() {
           />
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.chipRow}
+        >
           {statusFilters.map((filter) => {
             const active = selectedStatus === filter.id;
             return (
@@ -149,25 +178,40 @@ export default function GroupScreen() {
                   },
                 ]}
               >
-                <Text style={[styles.chipText, { color: active ? darkGreen : textColor }]}>{filter.name}</Text>
+                <Text
+                  style={[
+                    styles.chipText,
+                    { color: active ? darkGreen : textColor },
+                  ]}
+                >
+                  {filter.name}
+                </Text>
               </TouchableOpacity>
             );
           })}
         </ScrollView>
 
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: textColor }]}>Danh sách nhóm</Text>
-          <Text style={{ color: successGreen }}>{filteredGroups.length} nhóm</Text>
+          <Text style={[styles.sectionTitle, { color: textColor }]}>
+            Danh sách nhóm
+          </Text>
+          <Text style={{ color: successGreen }}>
+            {filteredGroups.length} nhóm
+          </Text>
         </View>
 
         <View style={styles.groupList}>
           {filteredGroups.map((group) => {
-            const latest = activitiesMap[group.id] ?? (group as any).latestActivity;
+            const latest =
+              activitiesMap[group.id] ?? (group as any).latestActivity;
             const formatActivity = (act: any) => {
               if (!act) return "Chưa có hoạt động nào";
               const raw = act.description ?? act.action ?? "";
               const action = String(raw).trim();
-              const actor = act.actorDisplayName ?? act.actor?.displayName ?? "Một thành viên";
+              const actor =
+                act.actorDisplayName ??
+                act.actor?.displayName ??
+                "Một thành viên";
 
               // Known exact mappings
               switch (action) {
@@ -219,7 +263,13 @@ export default function GroupScreen() {
                 let verb = "";
                 const objects: string[] = [];
                 for (const t of tokens) {
-                  if (!verb && verbMap[t] && /(created|create|added|updated|update|deleted|removed|joined|join|closed|settle|paid|refunded)/.test(t)) {
+                  if (
+                    !verb &&
+                    verbMap[t] &&
+                    /(created|create|added|updated|update|deleted|removed|joined|join|closed|settle|paid|refunded)/.test(
+                      t,
+                    )
+                  ) {
                     verb = verbMap[t];
                     continue;
                   }
@@ -233,7 +283,10 @@ export default function GroupScreen() {
                   objects.push(t);
                 }
 
-                const objectText = objects.join(" ").replace(/\s+/g, " ").trim();
+                const objectText = objects
+                  .join(" ")
+                  .replace(/\s+/g, " ")
+                  .trim();
                 if (verb) {
                   return `${actor} ${verb}${objectText ? " " + objectText : ""}`.trim();
                 }
@@ -276,26 +329,59 @@ export default function GroupScreen() {
                 style={styles.groupCard}
               >
                 <View style={styles.groupCardTop}>
-                  <View style={[styles.groupIcon, { backgroundColor: lightGreen }]}>
+                  <View
+                    style={[styles.groupIcon, { backgroundColor: lightGreen }]}
+                  >
                     <MaterialIcons name="groups" size={22} color={darkGreen} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text numberOfLines={1} style={[styles.groupName, { color: textColor }]}>{group.name}</Text>
-                    <Text style={styles.groupMeta}>{group.memberCount ?? 0} thành viên</Text>
+                    <Text
+                      numberOfLines={1}
+                      style={[styles.groupName, { color: textColor }]}
+                    >
+                      {group.name}
+                    </Text>
+                    <Text style={styles.groupMeta}>
+                      {group.memberCount ?? 0} thành viên
+                    </Text>
                   </View>
-                  <View style={[styles.statusPill, { backgroundColor: group.status === "closed" ? "#FDECEC" : "#E8F7EE" }]}>
-                    <Text style={{ color: group.status === "closed" ? errorRed : successGreen, fontSize: 12, fontWeight: "700" }}>
-                      {group.status === "closed" ? "Đã quyết toán" : "Đang hoạt động"}
+                  <View
+                    style={[
+                      styles.statusPill,
+                      {
+                        backgroundColor:
+                          group.status === "closed" ? "#FDECEC" : "#E8F7EE",
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={{
+                        color:
+                          group.status === "closed" ? errorRed : successGreen,
+                        fontSize: 12,
+                        fontWeight: "700",
+                      }}
+                    >
+                      {group.status === "closed"
+                        ? "Đã quyết toán"
+                        : "Đang hoạt động"}
                     </Text>
                   </View>
                 </View>
 
                 <View style={styles.activityBox}>
                   <Text style={styles.activityLabel}>Hoạt động gần nhất</Text>
-                  <Text numberOfLines={1} style={[styles.activityText, { color: textColor }]}>
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.activityText, { color: textColor }]}
+                  >
                     {formatActivity(latest)}
                   </Text>
-                  <Text style={styles.activityTime}>{latest?.time ? new Date(latest.time).toLocaleString() : "-"}</Text>
+                  <Text style={styles.activityTime}>
+                    {latest?.time
+                      ? new Date(latest.time).toLocaleString()
+                      : "-"}
+                  </Text>
                 </View>
               </TouchableOpacity>
             );
@@ -317,7 +403,12 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   loadingText: { marginTop: 12, color: "#6B7280" },
-  content: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 28, gap: 16 },
+  content: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 28,
+    gap: 16,
+  },
   headerCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 28,

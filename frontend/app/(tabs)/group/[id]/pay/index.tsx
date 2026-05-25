@@ -5,16 +5,16 @@ import { DebtEdge } from "@/api/types/settlement";
 import TopAppBar from "@/components/TopAppBar";
 import { useAuthStore } from "@/store/auth.store";
 
-import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
 
 import {
-    ActivityIndicator,
-    Image,
-    Pressable,
-    ScrollView,
-    Text,
-    View,
+  ActivityIndicator,
+  Image,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
 } from "react-native";
 
 // const currentUser = useAuthStore((state) => state.user);
@@ -27,24 +27,23 @@ export default function PayScreen() {
   const [debts, setDebts] = useState<DebtEdge[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchDebts = async () => {
-      try {
-        const data = await settlementService.getDebts(String(id));
-
-        console.log("debts", data);
-        console.log("currentUser", currentUser);
-
-        setDebts(data);
-      } catch (error) {
-        console.error("Failed to fetch debts:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDebts();
+  const fetchDebts = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await settlementService.getDebts(String(id));
+      setDebts(data);
+    } catch (error) {
+      console.error("Failed to fetch debts:", error);
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchDebts();
+    }, [fetchDebts]),
+  );
 
   // Người khác nợ bạn
   const peopleOweYou = useMemo(() => {

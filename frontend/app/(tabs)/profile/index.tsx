@@ -1,13 +1,22 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 import { meService } from "@/api/services/me.service";
 import type { User } from "@/api/types/auth";
 import type { Usage } from "@/api/types/me";
-import { useAuthStore } from "@/store/auth.store";
 import TopAppBar from "@/components/TopAppBar";
+import { useAuthStore } from "@/store/auth.store";
 
 const fallbackAvatar = require("../../../assets/images/icon.png");
 
@@ -26,7 +35,10 @@ export default function ProfileScreen() {
     const loadProfile = async () => {
       setLoading(true);
       try {
-        const [user, usage] = await Promise.all([meService.getProfile(), meService.getUsage()]);
+        const [user, usage] = await Promise.all([
+          meService.getProfile(),
+          meService.getUsage(),
+        ]);
 
         setProfile({ user, usage });
         setDraft(user);
@@ -62,7 +74,9 @@ export default function ProfileScreen() {
         avatarUrl: draft.avatarUrl,
       });
 
-      setProfile((current) => (current ? { ...current, user: updatedUser } : current));
+      setProfile((current) =>
+        current ? { ...current, user: updatedUser } : current,
+      );
       setDraft(updatedUser);
       useAuthStore.setState({ user: updatedUser, isAuthenticated: true });
       setIsEditing(false);
@@ -102,20 +116,35 @@ export default function ProfileScreen() {
         <View style={styles.heroCard}>
           <View style={styles.avatarWrap}>
             <Image
-              source={profile.user.avatarUrl ? { uri: profile.user.avatarUrl } : fallbackAvatar}
+              source={
+                profile.user.avatarUrl
+                  ? { uri: profile.user.avatarUrl }
+                  : fallbackAvatar
+              }
               style={styles.avatar}
             />
             <View style={styles.avatarBadge}>
-              <MaterialIcons name={isEditing ? "photo-library" : "edit"} size={18} color="#fff" />
+              <MaterialIcons
+                name={isEditing ? "photo-library" : "edit"}
+                size={18}
+                color="#fff"
+              />
             </View>
           </View>
 
-          <Text style={styles.nameText}>{draft?.displayName ?? profile.user.displayName}</Text>
-          <Text style={styles.emailText}>{profile.user.email ?? "Chưa có email"}</Text>
+          <Text style={styles.nameText}>
+            {draft?.displayName ?? profile.user.displayName}
+          </Text>
+          <Text style={styles.emailText}>
+            {profile.user.email ?? "Chưa có email"}
+          </Text>
 
           <View style={styles.statsRow}>
             <StatCard label="Nhóm" value={profile.usage.groupCount} />
-            <StatCard label="Smart settle" value={profile.usage.smartSettleUsedThisMonth} />
+            <StatCard
+              label="Smart settle"
+              value={profile.usage.smartSettleUsedThisMonth}
+            />
             <StatCard label="Quota" value={profile.usage.freeMaxGroups} />
           </View>
         </View>
@@ -127,28 +156,48 @@ export default function ProfileScreen() {
               <Input
                 value={draft?.displayName ?? ""}
                 placeholder="Họ và tên"
-                onChangeText={(value) => setDraft((current) => (current ? { ...current, displayName: value } : current))}
+                onChangeText={(value) =>
+                  setDraft((current) =>
+                    current ? { ...current, displayName: value } : current,
+                  )
+                }
               />
               <Input
                 value={draft?.avatarUrl ?? ""}
                 placeholder="Avatar URL"
-                onChangeText={(value) => setDraft((current) => (current ? { ...current, avatarUrl: value } : current))}
+                onChangeText={(value) =>
+                  setDraft((current) =>
+                    current ? { ...current, avatarUrl: value } : current,
+                  )
+                }
               />
               <View style={styles.buttonRow}>
-                <TouchableOpacity style={[styles.secondaryButton, { borderColor: "#E5E7EB" }]} onPress={cancelEditing}>
+                <TouchableOpacity
+                  style={[styles.secondaryButton, { borderColor: "#E5E7EB" }]}
+                  onPress={cancelEditing}
+                >
                   <Text style={styles.secondaryButtonText}>Hủy</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.primaryButton, { backgroundColor: "#16A34A" }]} onPress={handleSaveProfile}>
+                <TouchableOpacity
+                  style={[styles.primaryButton, { backgroundColor: "#16A34A" }]}
+                  onPress={handleSaveProfile}
+                >
                   <Text style={styles.primaryButtonText}>Lưu</Text>
                 </TouchableOpacity>
               </View>
             </View>
           ) : (
-            <TouchableOpacity activeOpacity={0.85} onPress={beginEditing} style={styles.infoCard}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={beginEditing}
+              style={styles.infoCard}
+            >
               <MaterialIcons name="account-circle" size={24} color="#16A34A" />
               <View style={{ flex: 1 }}>
                 <Text style={styles.infoTitle}>Cập nhật hồ sơ</Text>
-                <Text style={styles.infoText}>Chỉnh sửa tên hiển thị và avatar của bạn.</Text>
+                <Text style={styles.infoText}>
+                  Chỉnh sửa tên hiển thị và avatar của bạn.
+                </Text>
               </View>
               <MaterialIcons name="chevron-right" size={24} color="#6B7280" />
             </TouchableOpacity>
@@ -158,8 +207,20 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Tài khoản</Text>
           <View style={styles.menuCard}>
-            <MenuItem icon="lock-outline" label="Đổi mật khẩu" onPress={() => router.push("/auth/forgot-password")} />
-            <MenuItem icon="logout" label="Đăng xuất" onPress={() => router.replace("/auth/login")} danger />
+            <MenuItem
+              icon="lock-outline"
+              label="Đổi mật khẩu"
+              onPress={() => router.push("/auth/forgot-password")}
+            />
+            <MenuItem
+              icon="logout"
+              label="Đăng xuất"
+              onPress={() => {
+                router.replace("/auth/login");
+                useAuthStore.getState().logout();
+              }}
+              danger
+            />
           </View>
         </View>
       </ScrollView>
@@ -174,7 +235,15 @@ const StatCard = ({ label, value }: { label: string; value: number }) => (
   </View>
 );
 
-const Input = ({ value, placeholder, onChangeText }: { value: string; placeholder: string; onChangeText: (value: string) => void }) => (
+const Input = ({
+  value,
+  placeholder,
+  onChangeText,
+}: {
+  value: string;
+  placeholder: string;
+  onChangeText: (value: string) => void;
+}) => (
   <TextInput
     value={value}
     onChangeText={onChangeText}
@@ -184,10 +253,30 @@ const Input = ({ value, placeholder, onChangeText }: { value: string; placeholde
   />
 );
 
-const MenuItem = ({ icon, label, onPress, danger = false }: { icon: keyof typeof MaterialIcons.glyphMap; label: string; onPress: () => void; danger?: boolean }) => (
-  <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={styles.menuItem}>
-    <MaterialIcons name={icon} size={22} color={danger ? "#BA1A1A" : "#16A34A"} />
-    <Text style={[styles.menuText, danger && { color: "#BA1A1A" }]}>{label}</Text>
+const MenuItem = ({
+  icon,
+  label,
+  onPress,
+  danger = false,
+}: {
+  icon: keyof typeof MaterialIcons.glyphMap;
+  label: string;
+  onPress: () => void;
+  danger?: boolean;
+}) => (
+  <TouchableOpacity
+    activeOpacity={0.85}
+    onPress={onPress}
+    style={styles.menuItem}
+  >
+    <MaterialIcons
+      name={icon}
+      size={22}
+      color={danger ? "#BA1A1A" : "#16A34A"}
+    />
+    <Text style={[styles.menuText, danger && { color: "#BA1A1A" }]}>
+      {label}
+    </Text>
     <MaterialIcons name="chevron-right" size={22} color="#6B7280" />
   </TouchableOpacity>
 );
@@ -196,7 +285,12 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F4F7F4" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   loadingText: { marginTop: 12, color: "#6B7280" },
-  content: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24, gap: 16 },
+  content: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
+    gap: 16,
+  },
   heroCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 28,
@@ -209,7 +303,13 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   avatarWrap: { position: "relative", marginBottom: 14 },
-  avatar: { width: 120, height: 120, borderRadius: 60, borderWidth: 4, borderColor: "#16A34A" },
+  avatar: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 4,
+    borderColor: "#16A34A",
+  },
   avatarBadge: {
     position: "absolute",
     right: 0,

@@ -3,9 +3,12 @@ import { create } from "zustand";
 import { authService } from "@/api/services/auth.service";
 import { meService } from "@/api/services/me.service";
 import { tokenStorage } from "@/api/storage/token.storage";
+import { useFriendStore } from "@/store/friend.store";
+import { useGroupStore } from "@/store/group.store";
+import { useHistoryStore } from "@/store/history.store";
+import { useHomeStore } from "@/store/home.store";
 
 import type { User } from "@/api/types/auth";
-
 
 interface AuthStore {
   user: User | null;
@@ -89,8 +92,17 @@ export const useAuthStore = create<AuthStore>((set) => ({
       });
     }
   },
- async logout() {
+  async logout() {
     await tokenStorage.clear();
+
+    useHomeStore.getState().invalidate();
+    useHistoryStore.getState().invalidate();
+    useFriendStore.getState().invalidate();
+    useGroupStore.setState({
+      roles: {},
+      groupCache: {},
+      groupListCache: null,
+    });
 
     set({
       user: null,

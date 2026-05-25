@@ -171,7 +171,7 @@ export default function Index() {
     getCacheEntry: getHomeCacheEntry,
     applyCache: applyHomeCache,
     refresh: refreshHome,
-    ttlMs: 60_000,
+    ttlMs: 0,
   });
 
   const money = useMemo(() => Math.abs(netBalance), [netBalance]);

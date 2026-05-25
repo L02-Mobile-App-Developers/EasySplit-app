@@ -1,11 +1,17 @@
 import { AntDesign, MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useCallback, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert, Platform } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
-import TopAppBar from "@/components/TopAppBar";
-import { useAppTheme } from "@/hooks/useAppTheme";
-import { useTabCacheRefresh } from "@/hooks/useTabCacheRefresh";
 import {
   acceptFriendRequest,
   listFriends,
@@ -13,6 +19,9 @@ import {
   rejectFriendRequest,
   unfriend,
 } from "@/api/services/friend.service";
+import TopAppBar from "@/components/TopAppBar";
+import { useAppTheme } from "@/hooks/useAppTheme";
+import { useTabCacheRefresh } from "@/hooks/useTabCacheRefresh";
 import { useFriendStore } from "@/store/friend.store";
 
 type FriendItem = {
@@ -29,7 +38,12 @@ type FriendRequestItem = {
   status: string;
   createdAt: string;
 };
-type PublicUser = { id: string; displayName: string; email: string | null; avatarUrl?: string | null };
+type PublicUser = {
+  id: string;
+  displayName: string;
+  email: string | null;
+  avatarUrl?: string | null;
+};
 
 const getInitials = (name: string) =>
   name
@@ -40,7 +54,16 @@ const getInitials = (name: string) =>
     .join("") || "?";
 
 export default function FriendScreen() {
-  const { backgroundWhite, textColor, successGreen, errorRed, lightGray, darkGreen, tabIconDefault, lightGreen } = useAppTheme();
+  const {
+    backgroundWhite,
+    textColor,
+    successGreen,
+    errorRed,
+    lightGray,
+    darkGreen,
+    tabIconDefault,
+    lightGreen,
+  } = useAppTheme();
   const [friends, setFriends] = useState<FriendItem[]>([]);
   const [requests, setRequests] = useState<FriendRequestItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,29 +73,41 @@ export default function FriendScreen() {
   const setFriendCache = useFriendStore((s) => s.setCache);
   const invalidateFriendCache = useFriendStore((s) => s.invalidate);
 
-  const applyFriendCache = useCallback((data: { friends: FriendItem[]; requests: FriendRequestItem[] }) => {
-    setFriends(data.friends ?? []);
-    setRequests(data.requests ?? []);
-    setError(null);
-  }, []);
+  const applyFriendCache = useCallback(
+    (data: { friends: FriendItem[]; requests: FriendRequestItem[] }) => {
+      setFriends(data.friends ?? []);
+      setRequests(data.requests ?? []);
+      setError(null);
+    },
+    [],
+  );
 
-  const refreshFriends = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
-    if (!silent) setLoading(true);
-    setError(null);
+  const refreshFriends = useCallback(
+    async ({ silent = false }: { silent?: boolean } = {}) => {
+      if (!silent) setLoading(true);
+      setError(null);
 
-    try {
-      const [friendItems, requestItems] = await Promise.all([listFriends(), listIncomingRequests()]);
-      const data = { friends: friendItems as FriendItem[], requests: requestItems as FriendRequestItem[] };
-      applyFriendCache(data);
-      setFriendCache(data);
-    } catch (fetchError) {
-      console.log("Get friends error:", fetchError);
-      setError("Không thể tải danh sách bạn bè.");
-      applyFriendCache({ friends: [], requests: [] });
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }, [applyFriendCache, setFriendCache]);
+      try {
+        const [friendItems, requestItems] = await Promise.all([
+          listFriends(),
+          listIncomingRequests(),
+        ]);
+        const data = {
+          friends: friendItems as FriendItem[],
+          requests: requestItems as FriendRequestItem[],
+        };
+        applyFriendCache(data);
+        setFriendCache(data);
+      } catch (fetchError) {
+        console.log("Get friends error:", fetchError);
+        setError("Không thể tải danh sách bạn bè.");
+        applyFriendCache({ friends: [], requests: [] });
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [applyFriendCache, setFriendCache],
+  );
 
   useTabCacheRefresh({
     getCacheEntry: getFriendCacheEntry,
@@ -118,7 +153,7 @@ export default function FriendScreen() {
         await unfriend(friendId);
         invalidateFriendCache();
         await refreshFriends({ silent: true });
-      } catch (err) {
+      } catch (err: any) {
         console.log("Unfriend error:", err);
         const msg = err?.response?.data?.message ?? "Không thể hủy kết bạn.";
         if (Platform.OS === "web") window.alert(msg);
@@ -140,7 +175,7 @@ export default function FriendScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.screen, { backgroundColor: backgroundWhite }]}> 
+      <View style={[styles.screen, { backgroundColor: backgroundWhite }]}>
         <TopAppBar title="Bạn bè" showSearch showSettings />
         <View style={styles.center}>
           <ActivityIndicator size="large" color={darkGreen} />
@@ -156,61 +191,107 @@ export default function FriendScreen() {
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.heroCard}>
-          <Text style={[styles.pageTitle, { color: textColor }]}>Kết nối và chia sẻ chi tiêu</Text>
+          <Text style={[styles.pageTitle, { color: textColor }]}>
+            Kết nối và chia sẻ chi tiêu
+          </Text>
           <Text style={styles.pageSubtitle}>
             Quản lý lời mời kết bạn, thêm bạn qua email và xem danh sách bạn bè.
           </Text>
         </View>
 
-        <TouchableOpacity activeOpacity={0.85} onPress={() => router.push("/friend/add")} style={styles.emailInviteCard}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => router.push("/friend/add")}
+          style={styles.emailInviteCard}
+        >
           <View style={styles.emailInviteLeft}>
             <MaterialIcons name="mail-outline" size={24} color={darkGreen} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.sectionTitle, { color: textColor }]}>Mời bạn bè qua email</Text>
-              <Text style={styles.metaText}>Gửi lời mời trực tiếp bằng email từ ứng dụng.</Text>
+              <Text style={[styles.sectionTitle, { color: textColor }]}>
+                Mời bạn bè qua email
+              </Text>
+              <Text style={styles.metaText}>
+                Gửi lời mời trực tiếp bằng email từ ứng dụng.
+              </Text>
             </View>
           </View>
-          <MaterialIcons name="chevron-right" size={24} color={tabIconDefault} />
+          <MaterialIcons
+            name="chevron-right"
+            size={24}
+            color={tabIconDefault}
+          />
         </TouchableOpacity>
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: textColor }]}>Lời mời kết bạn</Text>
+            <Text style={[styles.sectionTitle, { color: textColor }]}>
+              Lời mời kết bạn
+            </Text>
             <Text style={{ color: darkGreen }}>{requests.length} mới</Text>
           </View>
 
           {error ? (
             <View style={styles.emptyCard}>
-              <MaterialIcons name="error-outline" size={24} color={tabIconDefault} />
+              <MaterialIcons
+                name="error-outline"
+                size={24}
+                color={tabIconDefault}
+              />
               <Text style={styles.emptyText}>{error}</Text>
             </View>
           ) : null}
 
           {requests.length === 0 ? (
             <View style={styles.emptyCard}>
-              <MaterialIcons name="mark-email-unread" size={24} color={tabIconDefault} />
+              <MaterialIcons
+                name="mark-email-unread"
+                size={24}
+                color={tabIconDefault}
+              />
               <Text style={styles.emptyText}>Chưa có lời mời nào.</Text>
             </View>
           ) : null}
           {requests.map((request: any) => (
             <View key={request.id} style={styles.requestCard}>
               <View style={styles.avatarCircle}>
-                <Text style={styles.avatarText}>{(request.fromUser?.displayName ?? request.id).slice(0, 2).toUpperCase()}</Text>
+                <Text style={styles.avatarText}>
+                  {(request.fromUser?.displayName ?? request.id)
+                    .slice(0, 2)
+                    .toUpperCase()}
+                </Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.friendName, { color: textColor }]}>{request.fromUser?.displayName ?? `Lời mời #${request.id.slice(0, 6)}`}</Text>
-                <Text style={styles.metaText}>Đã gửi vào {new Date(request.createdAt).toLocaleDateString("vi-VN")}</Text>
+                <Text style={[styles.friendName, { color: textColor }]}>
+                  {request.fromUser?.displayName ??
+                    `Lời mời #${request.id.slice(0, 6)}`}
+                </Text>
+                <Text style={styles.metaText}>
+                  Đã gửi vào{" "}
+                  {new Date(request.createdAt).toLocaleDateString("vi-VN")}
+                </Text>
               </View>
               <View style={styles.actionRow}>
                 <TouchableOpacity
-                  style={[styles.smallIconButton, { backgroundColor: darkGreen, opacity: mutatingId === request.id ? 0.6 : 1 }]}
+                  style={[
+                    styles.smallIconButton,
+                    {
+                      backgroundColor: darkGreen,
+                      opacity: mutatingId === request.id ? 0.6 : 1,
+                    },
+                  ]}
                   onPress={() => handleAccept(request.id)}
                   disabled={mutatingId === request.id}
                 >
                   <MaterialIcons name="check" size={20} color="white" />
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.smallIconButton, { backgroundColor: lightGray, opacity: mutatingId === request.id ? 0.6 : 1 }]}
+                  style={[
+                    styles.smallIconButton,
+                    {
+                      backgroundColor: lightGray,
+                      opacity: mutatingId === request.id ? 0.6 : 1,
+                    },
+                  ]}
                   onPress={() => handleReject(request.id)}
                   disabled={mutatingId === request.id}
                 >
@@ -223,13 +304,21 @@ export default function FriendScreen() {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: textColor }]}>Danh sách bạn bè</Text>
-            <Text style={{ color: tabIconDefault }}>{friends.length} người</Text>
+            <Text style={[styles.sectionTitle, { color: textColor }]}>
+              Danh sách bạn bè
+            </Text>
+            <Text style={{ color: tabIconDefault }}>
+              {friends.length} người
+            </Text>
           </View>
 
           {friends.length === 0 ? (
             <View style={styles.emptyCard}>
-              <MaterialIcons name="person-off" size={24} color={tabIconDefault} />
+              <MaterialIcons
+                name="person-off"
+                size={24}
+                color={tabIconDefault}
+              />
               <Text style={styles.emptyText}>Chưa có bạn bè nào.</Text>
             </View>
           ) : null}
@@ -243,20 +332,39 @@ export default function FriendScreen() {
                   <Text style={styles.avatarText}>{initials}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.friendName, { color: textColor }]}>{friend.displayName}</Text>
-                  <Text style={styles.metaText}>{friend.email ?? "Chưa có email"}</Text>
+                  <Text style={[styles.friendName, { color: textColor }]}>
+                    {friend.displayName}
+                  </Text>
+                  <Text style={styles.metaText}>
+                    {friend.email ?? "Chưa có email"}
+                  </Text>
                 </View>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+                >
                   <TouchableOpacity
-                    style={[styles.smallIconButton, { backgroundColor: lightGray, opacity: mutatingId === friend.id ? 0.6 : 1 }]}
+                    style={[
+                      styles.smallIconButton,
+                      {
+                        backgroundColor: lightGray,
+                        opacity: mutatingId === friend.id ? 0.6 : 1,
+                      },
+                    ]}
                     onPress={() => handleUnfriend(friend.id)}
                     disabled={mutatingId === friend.id}
                   >
                     <AntDesign name="delete" size={16} color={textColor} />
                   </TouchableOpacity>
 
-                  <TouchableOpacity activeOpacity={0.85} onPress={() => router.push("/friend/add") }>
-                    <MaterialIcons name="chevron-right" size={24} color={tabIconDefault} />
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => router.push("/friend/add")}
+                  >
+                    <MaterialIcons
+                      name="chevron-right"
+                      size={24}
+                      color={tabIconDefault}
+                    />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -267,10 +375,17 @@ export default function FriendScreen() {
         <View style={styles.helperCard}>
           <MaterialIcons name="group-add" size={28} color={darkGreen} />
           <View style={{ flex: 1 }}>
-            <Text style={[styles.helperTitle, { color: textColor }]}>Thêm bạn mới</Text>
-            <Text style={styles.metaText}>Gửi lời mời qua email để kết nối nhanh hơn.</Text>
+            <Text style={[styles.helperTitle, { color: textColor }]}>
+              Thêm bạn mới
+            </Text>
+            <Text style={styles.metaText}>
+              Gửi lời mời qua email để kết nối nhanh hơn.
+            </Text>
           </View>
-          <TouchableOpacity style={[styles.ctaButton, { backgroundColor: lightGreen }]} onPress={() => router.push("/friend/add")}>
+          <TouchableOpacity
+            style={[styles.ctaButton, { backgroundColor: lightGreen }]}
+            onPress={() => router.push("/friend/add")}
+          >
             <Text style={{ color: darkGreen, fontWeight: "800" }}>Mời</Text>
           </TouchableOpacity>
         </View>
@@ -283,7 +398,12 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   loadingText: { marginTop: 12, color: "#6B7280" },
-  content: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24, gap: 16 },
+  content: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
+    gap: 16,
+  },
   heroCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 28,
@@ -310,9 +430,18 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 2,
   },
-  emailInviteLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
+  emailInviteLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
   section: { gap: 12 },
-  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   sectionTitle: { fontSize: 16, fontWeight: "700" },
   requestCard: {
     flexDirection: "row",
