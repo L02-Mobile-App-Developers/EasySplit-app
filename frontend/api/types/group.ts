@@ -8,6 +8,11 @@ export interface Group {
   status: "active" | "closed";
   role: "owner" | "admin" | "member";
   memberCount: number;
+  latestActivity?: {
+    description: string;
+    time: string;
+    actorDisplayName?: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -22,6 +22,7 @@ import { balanceService } from "@/api/services/balance.service";
 import { expenseService } from "@/api/services/expense.service";
 import { groupService } from "@/api/services/group.service";
 import { settlementService } from "@/api/services/settlement.service";
+import { activityService } from "@/api/services/activity.service";
 
 import type { Balance } from "@/api/types/balance";
 import type { Expense } from "@/api/types/expense";
@@ -29,6 +30,7 @@ import type { Group, GroupMember } from "@/api/types/group";
 import type { DebtEdge } from "@/api/types/settlement";
 
 import { useAuthStore } from "@/store/auth.store";
+import { useGroupStore } from "@/store/group.store";
 
 const currency = (value: number) => `${value.toLocaleString("vi-VN")}đ`;
 
@@ -36,48 +38,124 @@ export default function GroupDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const currentUser = useAuthStore((state) => state.user);
+  const fetchMe = useAuthStore((state) => state.fetchMe);
 
   const [group, setGroup] = useState<Group>();
   const [members, setMembers] = useState<GroupMember[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [myBalance, setMyBalance] = useState<Balance>();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
 
   const [memberToPay, setMemberToPay] = useState<DebtEdge[]>([]);
   const [debts, setDebts] = useState<DebtEdge[]>([]);
+  const [history, setHistory] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
+  const cachedRole = useGroupStore((s) => (id ? s.roles[id as string] : undefined));
+  const getGroupCacheEntry = useGroupStore((s) => (s as any).getGroupCacheEntry);
+  const setGroupCache = useGroupStore((s) => s.setGroupCache);
   useEffect(() => {
     if (!id) return;
 
-    const fetchData = async () => {
-      try {
-        const [groupData, membersData, expensePage, balanceData, debtData] =
-          await Promise.all([
+    // Try to load cached data first
+    const cacheEntry = getGroupCacheEntry?.(id as string);
+    const TTL = 30 * 1000; // 30 seconds
+    const now = Date.now();
+    if (cacheEntry) {
+      const { data, ts } = cacheEntry as any;
+      setGroup(data.group ?? undefined);
+      setMembers(data.members ?? []);
+      setExpenses(data.expenses ?? []);
+      setMyBalance(data.myBalance ?? undefined);
+      setDebts(data.debts ?? []);
+      const filtered = (data.debts ?? []).filter((item: any) => item.fromUser?.id === currentUser?.id);
+      setMemberToPay(filtered);
+
+      // If cache stale, refresh in background; otherwise still refresh in background to keep data fresh
+      const shouldRefresh = !ts || now - ts > TTL;
+      if (shouldRefresh) {
+        (async () => {
+          try {
+            const [groupData, membersData, expensePage, balanceData, debtData] = await Promise.all([
+              groupService.getGroup(id),
+              groupService.getGroupMembers(id),
+              expenseService.getExpenses(id),
+              balanceService.getMyBalance(id),
+              settlementService.getDebts(id),
+            ]);
+            setGroup(groupData);
+            setMembers(membersData);
+            setExpenses(expensePage.items);
+            setMyBalance(balanceData);
+            setDebts(debtData);
+            const filtered2 = debtData.filter((item) => item.fromUser?.id === currentUser?.id);
+            setMemberToPay(filtered2);
+            setGroupCache(id, { group: groupData, members: membersData, expenses: expensePage.items, myBalance: balanceData, debts: debtData });
+          } catch (err) {
+            console.error("Background refresh failed:", err);
+          }
+        })();
+      }
+    } else {
+      // no cache - fetch immediately
+      (async () => {
+        try {
+          const [groupData, membersData, expensePage, balanceData, debtData] = await Promise.all([
             groupService.getGroup(id),
             groupService.getGroupMembers(id),
             expenseService.getExpenses(id),
             balanceService.getMyBalance(id),
             settlementService.getDebts(id),
           ]);
+          setGroup(groupData);
+          setMembers(membersData);
+          setExpenses(expensePage.items);
+          setMyBalance(balanceData);
+          setDebts(debtData);
+          const filtered = debtData.filter((item) => item.fromUser?.id === currentUser?.id);
+          setMemberToPay(filtered);
+          setGroupCache(id, { group: groupData, members: membersData, expenses: expensePage.items, myBalance: balanceData, debts: debtData });
+        } catch (error) {
+          console.error("Failed to load group detail:", error);
+        }
+      })();
+    }
 
-        setGroup(groupData);
-        setMembers(membersData);
-        setExpenses(expensePage.items);
-        setMyBalance(balanceData);
-        setDebts(debtData);
+    // fetch recent history (activities)
+    const fetchHistory = async () => {
+      setHistoryLoading(true);
+      try {
+        const res = await activityService.getHistory(id);
+        let items = res.items ?? [];
+        if (!items || items.length === 0) {
+          // fallback to activities endpoint
+          try {
+            const act = await activityService.getActivities(id);
+            items = act.items ?? [];
+          } catch (e) {
+            console.debug("activities fallback failed", e);
+          }
+        }
 
-        const filtered = debtData.filter(
-          (item) => item.fromUser?.id === currentUser?.id,
-        );
-
-        setMemberToPay(filtered);
-      } catch (error) {
-        console.error("Failed to load group detail:", error);
+        setHistory(items);
+      } catch (err) {
+        console.error("Failed to load history:", err);
+      } finally {
+        setHistoryLoading(false);
       }
     };
-
-    fetchData();
+    fetchHistory();
   }, [id]);
+
+  useEffect(() => {
+    // ensure we have current user loaded so action buttons (leave) can work
+    if (!currentUser) {
+      fetchMe().catch(() => {});
+    }
+  }, [currentUser, fetchMe]);
+
+  const effectiveRole = group?.role ?? cachedRole;
 
   const debtHighlights = useMemo(() => {
     if (!currentUser) {
@@ -195,58 +273,130 @@ export default function GroupDetailScreen() {
             <Text style={styles.actionButtonSecondaryText}>Thanh toán</Text>
           </Pressable>
 
-          <Pressable
-            onPress={async () => {
-              if (isDeleting) return;
+          {(() => {
+            if (!group && !effectiveRole) {
+              return (
+                <Pressable style={styles.actionButtonSecondary} disabled>
+                  <ActivityIndicator size="small" color="#0F172A" />
+                </Pressable>
+              );
+            }
 
-              const confirmMsg = "Bạn có chắc muốn xóa nhóm này? Hành động không thể hoàn tác.";
+            if (effectiveRole === "owner") {
+              return (
+                <Pressable
+                  onPress={async () => {
+                    if (isDeleting) return;
 
-              const doDelete = async () => {
-                setIsDeleting(true);
-                try {
-                  await groupService.deleteGroup(id as string);
+                    const confirmMsg = "Bạn có chắc muốn xóa nhóm này? Hành động không thể hoàn tác.";
+
+                    const doDelete = async () => {
+                      setIsDeleting(true);
+                      try {
+                        await groupService.deleteGroup(id as string);
+                        if (Platform.OS === "web") {
+                          window.alert("Nhóm đã được xóa");
+                          router.replace("/group");
+                        } else {
+                          Alert.alert("Đã xóa", "Nhóm đã được xóa", [
+                            { text: "OK", onPress: () => router.replace("/group") },
+                          ]);
+                        }
+                      } catch (err: any) {
+                        console.error("Delete group error", err);
+                        const msg = err?.response?.data?.message ?? "Không thể xóa nhóm, thử lại sau.";
+                        if (Platform.OS === "web") window.alert(msg);
+                        else Alert.alert("Lỗi", msg);
+                      } finally {
+                        setIsDeleting(false);
+                      }
+                    };
+
+                    if (Platform.OS === "web") {
+                      if (window.confirm(confirmMsg)) await doDelete();
+                    } else {
+                      Alert.alert("Xóa nhóm", confirmMsg, [
+                        { text: "Hủy", style: "cancel" },
+                        { text: "Xóa", style: "destructive", onPress: doDelete },
+                      ]);
+                    }
+                  }}
+                  style={[
+                    styles.actionButtonSecondary,
+                    { borderColor: "#FECACA", backgroundColor: "#FFF1F2" },
+                  ]}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    <ActivityIndicator size="small" color="#B91C1C" />
+                  ) : (
+                    <>
+                      <MaterialIcons name="delete" size={18} color="#B91C1C" />
+                      <Text style={[styles.actionButtonSecondaryText, { color: "#B91C1C" }]}>Xóa nhóm</Text>
+                    </>
+                  )}
+                </Pressable>
+              );
+            }
+
+            return (
+              <Pressable
+                onPress={async () => {
+                  if (isLeaving) return;
+                  if (!currentUser || !currentUser.id) {
+                    const msg = "Không tìm thấy thông tin người dùng. Vui lòng thử đăng nhập lại.";
+                    if (Platform.OS === "web") window.alert(msg);
+                    else Alert.alert("Lỗi", msg);
+                    return;
+                  }
+
+                  const confirmMsg = "Bạn có chắc muốn rời khỏi nhóm này?";
+
+                  const doLeave = async () => {
+                    setIsLeaving(true);
+                    try {
+                      await groupService.removeGroupMember(id as string, currentUser?.id as string);
+                      if (Platform.OS === "web") {
+                        window.alert("Bạn đã rời nhóm");
+                        router.replace("/group");
+                      } else {
+                        Alert.alert("Đã rời", "Bạn đã rời nhóm", [
+                          { text: "OK", onPress: () => router.replace("/group") },
+                        ]);
+                      }
+                    } catch (err: any) {
+                      console.error("Leave group error", err);
+                      const msg = err?.response?.data?.message ?? "Không thể rời nhóm, thử lại sau.";
+                      if (Platform.OS === "web") window.alert(msg);
+                      else Alert.alert("Lỗi", msg);
+                    } finally {
+                      setIsLeaving(false);
+                    }
+                  };
+
                   if (Platform.OS === "web") {
-                    window.alert("Nhóm đã được xóa");
-                    router.replace("/group");
+                    if (window.confirm(confirmMsg)) await doLeave();
                   } else {
-                    Alert.alert("Đã xóa", "Nhóm đã được xóa", [
-                      { text: "OK", onPress: () => router.replace("/group") },
+                    Alert.alert("Rời nhóm", confirmMsg, [
+                      { text: "Hủy", style: "cancel" },
+                      { text: "Rời", style: "destructive", onPress: doLeave },
                     ]);
                   }
-                } catch (err: any) {
-                  console.error("Delete group error", err);
-                  const msg = err?.response?.data?.message ?? "Không thể xóa nhóm, thử lại sau.";
-                  if (Platform.OS === "web") window.alert(msg);
-                  else Alert.alert("Lỗi", msg);
-                } finally {
-                  setIsDeleting(false);
-                }
-              };
-
-              if (Platform.OS === "web") {
-                if (window.confirm(confirmMsg)) await doDelete();
-              } else {
-                Alert.alert("Xóa nhóm", confirmMsg, [
-                  { text: "Hủy", style: "cancel" },
-                  { text: "Xóa", style: "destructive", onPress: doDelete },
-                ]);
-              }
-            }}
-            style={[
-              styles.actionButtonSecondary,
-              { borderColor: "#FECACA", backgroundColor: "#FFF1F2" },
-            ]}
-            disabled={group?.role !== "owner" || isDeleting}
-          >
-            {isDeleting ? (
-              <ActivityIndicator size="small" color="#B91C1C" />
-            ) : (
-              <>
-                <MaterialIcons name="delete" size={18} color="#B91C1C" />
-                <Text style={[styles.actionButtonSecondaryText, { color: "#B91C1C" }]}>Xóa nhóm</Text>
-              </>
-            )}
-          </Pressable>
+                }}
+                style={styles.actionButtonSecondary}
+                disabled={isLeaving || !currentUser || !currentUser.id}
+              >
+                {isLeaving ? (
+                  <ActivityIndicator size="small" color="#0F5E28" />
+                ) : (
+                  <>
+                    <MaterialIcons name="logout" size={18} color="#0F172A" />
+                    <Text style={styles.actionButtonSecondaryText}>Rời nhóm</Text>
+                  </>
+                )}
+              </Pressable>
+            );
+          })()}
         </View>
 
         {/* PAY DEBT */}
@@ -330,6 +480,29 @@ export default function GroupDetailScreen() {
               </TouchableOpacity>
             ))}
           </View>
+        </View>
+
+        {/* HISTORY */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Lịch sử hoạt động</Text>
+
+            <Text style={styles.sectionCount}>{history.length}</Text>
+          </View>
+
+          {historyLoading ? (
+            <ActivityIndicator size="small" />
+          ) : (
+            <View style={{ gap: 8 }}>
+              {history.length === 0 && <Text style={{ color: "#6B7280" }}>Chưa có lịch sử</Text>}
+              {history.map((h) => (
+                <View key={h.id} style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#F3F4F6" }}>
+                  <Text style={{ fontWeight: "700" }}>{h.actor?.displayName ?? "Một thành viên"} • {String(h.action).replace(/_|\./g, ' ')}</Text>
+                  <Text style={{ color: "#6B7280", marginTop: 4 }}>{new Date(h.createdAt).toLocaleString()}</Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
 
         {/* MEMBERS */}

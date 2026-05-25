@@ -124,12 +124,35 @@ export async function getGroups(userId: string) {
   const groups = await Promise.all(
     memberships.map(async (membership) => {
       const group = await getDoc<Group>(collectionNames.groups, membership.groupId);
-      return group
-        ? {
-            ...group,
-            role: membership.role,
-          }
-        : null;
+      if (!group) return null;
+      const activeMembers = await getActiveMembers(group.id);
+
+      // fetch latest activity (audit log) for this group
+      const logs = (
+        await getQuery(
+          collectionRef(collectionNames.auditLogs)
+            .where("entityType", "==", "group")
+            .where("entityId", "==", group.id),
+        )
+      ).sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime());
+
+      let latestActivity: { description: string; time: string; actorDisplayName?: string } | null = null;
+      if (logs.length > 0) {
+        const log = logs[0];
+        const actor = await getDoc<AppUser>(collectionNames.users, log.actorUserId);
+        latestActivity = {
+          description: log.action,
+          time: log.createdAt.toISOString(),
+          actorDisplayName: actor?.displayName ?? undefined,
+        };
+      }
+
+      return {
+        ...group,
+        role: membership.role,
+        memberCount: activeMembers.length,
+        latestActivity,
+      };
     }),
   );
 
@@ -324,15 +347,19 @@ export async function removeMember(
   userId: string,
   targetUserId: string,
 ) {
-  await assertOwner(groupId, userId);
-
-  if (userId === targetUserId) {
-    throw new ForbiddenError("Owner cannot remove themselves");
+  // If the requester is removing someone else, require owner.
+  if (userId !== targetUserId) {
+    await assertOwner(groupId, userId);
   }
 
   const member = await getMembership(groupId, targetUserId);
   if (!member || !member.isActive) {
     throw new NotFoundError("Member not found");
+  }
+
+  // Owner cannot remove themselves; they must delete the group instead.
+  if (member.role === "owner" && userId === targetUserId) {
+    throw new ForbiddenError("Owner cannot remove themselves");
   }
 
   await docRef(

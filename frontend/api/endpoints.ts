@@ -29,6 +29,7 @@ export const ENDPOINTS = {
     SEND: "/friends",
     ACCEPT: (requestId: string) => `/friends/${requestId}/accept`,
     REJECT: (requestId: string) => `/friends/${requestId}`,
+    UNFRIEND: (friendId: string) => `/friends/${friendId}/unfriend`,
   },
 
   GROUPS: {

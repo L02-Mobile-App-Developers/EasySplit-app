@@ -82,4 +82,19 @@ router.delete(
   },
 );
 
+// POST /friends/:id/unfriend -> remove friendship
+router.post(
+  "/:id/unfriend",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.user!.userId;
+      const friendId = req.params.id as string;
+      const result = await friendService.removeFriend(userId, friendId);
+      sendSuccess(res, result, "Friend removed");
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 export default router;

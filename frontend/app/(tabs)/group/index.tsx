@@ -15,6 +15,7 @@ import TopAppBar from "@/components/TopAppBar";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { activityService } from "@/api/services/activity.service";
 import { groupService } from "@/api/services/group.service";
+import { useGroupStore } from "@/store/group.store";
 import type { Group } from "@/api/types/group";
 
 const statusFilters = [
@@ -37,6 +38,17 @@ export default function GroupScreen() {
     try {
       const data = await groupService.getGroups();
       setGroups(data);
+      // cache latest activity from backend and membership roles for faster rendering
+      const aMap: Record<string, any> = {};
+      const map: Record<string, string | undefined> = {};
+      data.forEach((g) => {
+        map[g.id] = g.role;
+        if ((g as any).latestActivity) {
+          aMap[g.id] = (g as any).latestActivity;
+        }
+      });
+      useGroupStore.getState().setRoles(map);
+      setActivitiesMap(aMap);
     } catch (error) {
       console.log("Get groups error:", error);
     } finally {
@@ -50,28 +62,7 @@ export default function GroupScreen() {
   }, []);
 
   useEffect(() => {
-    if (groups.length === 0) return;
-
-    const fetchActivities = async () => {
-      try {
-        const results = await Promise.all(
-          groups.map(async (group) => {
-            const data = await activityService.getActivities(group.id);
-            return { groupId: group.id, data };
-          }),
-        );
-
-        const map: Record<string, any> = {};
-        results.forEach((r: any) => {
-          map[r.groupId] = r.data.items?.[0] ?? null;
-        });
-        setActivitiesMap(map);
-      } catch (err) {
-        console.log("Get activities error:", err);
-      }
-    };
-
-    fetchActivities();
+    // latestActivity is provided by the backend in getGroups; nothing to do here
   }, [groups]);
 
   const filteredGroups = useMemo(() => {
@@ -166,7 +157,33 @@ export default function GroupScreen() {
 
         <View style={styles.groupList}>
           {filteredGroups.map((group) => {
-            const latest = activitiesMap[group.id];
+            const latest = activitiesMap[group.id] ?? (group as any).latestActivity;
+            const formatActivity = (act: any) => {
+              if (!act) return "Chưa có hoạt động nào";
+              const action = String(act.description ?? act.action ?? "");
+              const actor = act.actorDisplayName ?? act.actor?.displayName ?? "Một thành viên";
+              switch (action) {
+                case "expense_created":
+                case "expense.create":
+                case "expense:created":
+                  return `${actor} đã thêm khoản chi`;
+                case "expense_updated":
+                case "expense.update":
+                  return `${actor} đã cập nhật khoản chi`;
+                case "settlement_created":
+                case "settlement.create":
+                  return `${actor} đã tạo quyết toán`;
+                case "member_added":
+                case "member.join":
+                  return `${actor} đã tham gia nhóm`;
+                case "group_closed":
+                case "group.close":
+                  return `${actor} đã quyết toán nhóm`;
+                default:
+                  // fallback: show raw action but prettier
+                  return action.replace(/_/g, " ").replace(/\./g, " ") || "Hoạt động";
+              }
+            };
             return (
               <TouchableOpacity
                 key={group.id}
@@ -192,9 +209,9 @@ export default function GroupScreen() {
                 <View style={styles.activityBox}>
                   <Text style={styles.activityLabel}>Hoạt động gần nhất</Text>
                   <Text numberOfLines={1} style={[styles.activityText, { color: textColor }]}>
-                    {latest?.description ?? "Chưa có hoạt động nào"}
+                    {formatActivity(latest)}
                   </Text>
-                  <Text style={styles.activityTime}>{latest?.time ?? "-"}</Text>
+                  <Text style={styles.activityTime}>{latest?.time ? new Date(latest.time).toLocaleString() : "-"}</Text>
                 </View>
               </TouchableOpacity>
             );

@@ -31,6 +31,7 @@ export default function AddExpenseScreen() {
   const [amount, setAmount] = useState("");
   const [payer, setPayer] = useState("");
   const [showPayerModal, setShowPayerModal] = useState(false);
+  const [payerId, setPayerId] = useState<string | null>(null);
 
   const [members, setMembers] = useState<GroupMember[]>([]);
 
@@ -99,17 +100,27 @@ export default function AddExpenseScreen() {
           break;
       }
 
-      const participants = selectedParticipantIds.map((userId) => ({
-        userId,
-        value: splitModeValue === "equal" ? perPersonAmount : perPersonAmount,
-      }));
+      // compute participant values for payload
+      let participants: { userId: string; value: number }[] = [];
+
+      if (splitModeValue === "equal") {
+        const base = Math.floor(parsedAmount / selectedParticipantIds.length);
+        let remainder = parsedAmount - base * selectedParticipantIds.length;
+        participants = selectedParticipantIds.map((userId) => {
+          const val = base + (remainder > 0 ? 1 : 0);
+          if (remainder > 0) remainder -= 1;
+          return { userId, value: val };
+        });
+      } else {
+        // amount/percent modes not fully supported in UI yet — fallback to equal shares
+        participants = selectedParticipantIds.map((userId) => ({ userId, value: perPersonAmount }));
+      }
 
       const payload: CreateExpenseRequest = {
         description: expenseName,
         amount: parsedAmount,
         currency: "VND",
-        paidByUserId:
-          members.find((m) => m.displayName === payer)?.userId || "",
+        paidByUserId: payerId || members.find((m) => m.displayName === payer)?.userId || "",
         splitMode: splitModeValue,
         participants,
       };
@@ -140,6 +151,7 @@ export default function AddExpenseScreen() {
 
         if (response.length > 0) {
           setPayer(response[0].displayName);
+          setPayerId(response[0].userId);
         }
       } catch (error) {
         console.error("Error fetching group members:", error);
@@ -309,12 +321,13 @@ export default function AddExpenseScreen() {
                   >
                     Chọn người trả
                   </Text>
-                  <ScrollView>
+                    <ScrollView>
                     {members.map((member) => (
                       <Pressable
                         key={member.userId}
                         onPress={() => {
                           setPayer(member.displayName);
+                          setPayerId(member.userId);
                           setShowPayerModal(false);
                         }}
                         style={{

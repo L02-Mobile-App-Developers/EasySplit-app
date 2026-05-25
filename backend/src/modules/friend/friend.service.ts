@@ -23,7 +23,13 @@ export async function sendFriendRequest(fromUserId: string, toEmail: string) {
       .where("toUserId", "==", to.id)
       .limit(1),
   );
-  if (existing.length > 0) throw new ConflictError("Friend request already sent");
+  if (existing.length > 0) {
+    const ex = existing[0];
+    if (ex.status === "pending") {
+      throw new ConflictError("Friend request already sent");
+    }
+    // If previous request exists but is not pending (e.g., rejected/cancelled), allow sending again
+  }
 
   const id = createId();
   const doc = {
@@ -75,7 +81,13 @@ export async function listFriends(userId: string) {
 
 export async function listIncomingRequests(userId: string) {
   const items = await getQuery(collectionRef(collectionNames.friendRequests).where("toUserId", "==", userId).where("status", "==", "pending"));
-  return items;
+  const fromIds = items.map((it: any) => it.fromUserId);
+  const map = await publicUserMap(fromIds);
+
+  return items.map((it: any) => ({
+    ...it,
+    fromUser: map.get(it.fromUserId) ?? null,
+  }));
 }
 
 export async function rejectOrCancelFriendRequest(userId: string, requestId: string) {
@@ -91,6 +103,27 @@ export async function rejectOrCancelFriendRequest(userId: string, requestId: str
   const updated = { ...reqDoc, status: "rejected", respondedAt: new Date() };
   await docRef(collectionNames.friendRequests, requestId).set(cleanForFirestore(updated));
   return updated;
+}
+
+export async function removeFriend(userId: string, friendId: string) {
+  // find friendship documents where (userIdA == userId && userIdB == friendId) or swapped
+  const a = await getQuery(
+    collectionRef(collectionNames.friendships).where("userIdA", "==", userId).where("userIdB", "==", friendId),
+  );
+  const b = await getQuery(
+    collectionRef(collectionNames.friendships).where("userIdA", "==", friendId).where("userIdB", "==", userId),
+  );
+
+  const docs = [...a, ...b];
+  if (docs.length === 0) {
+    throw new NotFoundError("Friendship not found");
+  }
+
+  const batch = collectionRef(collectionNames.friendships).firestore.batch();
+  docs.forEach((d: any) => batch.delete(docRef(collectionNames.friendships, d.id)));
+  await batch.commit();
+
+  return { removed: docs.map((d: any) => d.id) };
 }
 
 export default {};

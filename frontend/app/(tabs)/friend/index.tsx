@@ -1,7 +1,7 @@
 import { AntDesign, MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert, Platform } from "react-native";
 
 import TopAppBar from "@/components/TopAppBar";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -10,6 +10,7 @@ import {
   listFriends,
   listIncomingRequests,
   rejectFriendRequest,
+  unfriend,
 } from "@/api/services/friend.service";
 
 type FriendItem = {
@@ -26,6 +27,7 @@ type FriendRequestItem = {
   status: string;
   createdAt: string;
 };
+type PublicUser = { id: string; displayName: string; email: string | null; avatarUrl?: string | null };
 
 const getInitials = (name: string) =>
   name
@@ -91,6 +93,35 @@ export default function FriendScreen() {
     }
   };
 
+  const handleUnfriend = async (friendId: string) => {
+    if (mutatingId) return;
+    const confirmMsg = "Bạn có chắc muốn hủy kết bạn?";
+
+    const doUnfriend = async () => {
+      setMutatingId(friendId);
+      try {
+        await unfriend(friendId);
+        await loadFriends();
+      } catch (err) {
+        console.log("Unfriend error:", err);
+        const msg = err?.response?.data?.message ?? "Không thể hủy kết bạn.";
+        if (Platform.OS === "web") window.alert(msg);
+        else Alert.alert("Lỗi", msg);
+      } finally {
+        setMutatingId(null);
+      }
+    };
+
+    if (Platform.OS === "web") {
+      if (window.confirm(confirmMsg)) doUnfriend();
+    } else {
+      Alert.alert("Hủy kết bạn", confirmMsg, [
+        { text: "Hủy", style: "cancel" },
+        { text: "Xác nhận", onPress: doUnfriend },
+      ]);
+    }
+  };
+
   if (loading) {
     return (
       <View style={[styles.screen, { backgroundColor: backgroundWhite }]}> 
@@ -145,14 +176,13 @@ export default function FriendScreen() {
               <Text style={styles.emptyText}>Chưa có lời mời nào.</Text>
             </View>
           ) : null}
-
-          {requests.map((request) => (
+          {requests.map((request: any) => (
             <View key={request.id} style={styles.requestCard}>
               <View style={styles.avatarCircle}>
-                <Text style={styles.avatarText}>{request.id.slice(0, 2).toUpperCase()}</Text>
+                <Text style={styles.avatarText}>{(request.fromUser?.displayName ?? request.id).slice(0, 2).toUpperCase()}</Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.friendName, { color: textColor }]}>Lời mời #{request.id.slice(0, 6)}</Text>
+                <Text style={[styles.friendName, { color: textColor }]}>{request.fromUser?.displayName ?? `Lời mời #${request.id.slice(0, 6)}`}</Text>
                 <Text style={styles.metaText}>Đã gửi vào {new Date(request.createdAt).toLocaleDateString("vi-VN")}</Text>
               </View>
               <View style={styles.actionRow}>
@@ -192,12 +222,7 @@ export default function FriendScreen() {
             const initials = getInitials(friend.displayName);
 
             return (
-              <TouchableOpacity
-                key={friend.id}
-                activeOpacity={0.85}
-                onPress={() => router.push("/friend/add")}
-                style={styles.friendCard}
-              >
+              <View key={friend.id} style={styles.friendCard}>
                 <View style={styles.avatarCircle}>
                   <Text style={styles.avatarText}>{initials}</Text>
                 </View>
@@ -205,8 +230,20 @@ export default function FriendScreen() {
                   <Text style={[styles.friendName, { color: textColor }]}>{friend.displayName}</Text>
                   <Text style={styles.metaText}>{friend.email ?? "Chưa có email"}</Text>
                 </View>
-                <MaterialIcons name="chevron-right" size={24} color={tabIconDefault} />
-              </TouchableOpacity>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <TouchableOpacity
+                    style={[styles.smallIconButton, { backgroundColor: lightGray, opacity: mutatingId === friend.id ? 0.6 : 1 }]}
+                    onPress={() => handleUnfriend(friend.id)}
+                    disabled={mutatingId === friend.id}
+                  >
+                    <AntDesign name="delete" size={16} color={textColor} />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity activeOpacity={0.85} onPress={() => router.push("/friend/add") }>
+                    <MaterialIcons name="chevron-right" size={24} color={tabIconDefault} />
+                  </TouchableOpacity>
+                </View>
+              </View>
             );
           })}
         </View>

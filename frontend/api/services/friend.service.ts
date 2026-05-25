@@ -26,4 +26,9 @@ export async function rejectFriendRequest(requestId: string) {
   return res.data.data;
 }
 
+export async function unfriend(friendId: string) {
+  const res = await apiClient.post(ENDPOINTS.FRIENDS.UNFRIEND(friendId));
+  return res.data.data;
+}
+
 export default { listFriends, listIncomingRequests, sendFriendRequest, acceptFriendRequest };

@@ -1,7 +1,7 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Platform } from "react-native";
 
 import TopAppBar from "@/components/TopAppBar";
 import { sendFriendRequest } from "@/api/services/friend.service";
@@ -17,10 +17,19 @@ export default function AddFriendScreen() {
 
     try {
       await sendFriendRequest(email.trim());
-      Alert.alert("Đã gửi lời mời", "Yêu cầu kết bạn đã được gửi.", [{ text: "OK", onPress: () => router.back() }]);
-    } catch (error) {
+      const msgTitle = "Đã gửi lời mời";
+      const msgBody = "Yêu cầu kết bạn đã được gửi.";
+      if (Platform.OS === "web") {
+        window.alert(`${msgTitle}\n\n${msgBody}`);
+        router.replace("/friend");
+      } else {
+        Alert.alert(msgTitle, msgBody, [{ text: "OK", onPress: () => router.replace("/friend") }]);
+      }
+    } catch (error: any) {
       console.error("Send friend request failed", error);
-      Alert.alert("Không gửi được", "Kiểm tra lại email hoặc kết nối mạng.");
+      const msg = error?.response?.data?.message ?? "Kiểm tra lại email hoặc kết nối mạng.";
+      if (Platform.OS === "web") window.alert(msg);
+      else Alert.alert("Không gửi được", msg);
     }
   };
 
