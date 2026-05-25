@@ -165,8 +165,11 @@ export default function GroupScreen() {
             const latest = activitiesMap[group.id] ?? (group as any).latestActivity;
             const formatActivity = (act: any) => {
               if (!act) return "Chưa có hoạt động nào";
-              const action = String(act.description ?? act.action ?? "");
+              const raw = act.description ?? act.action ?? "";
+              const action = String(raw).trim();
               const actor = act.actorDisplayName ?? act.actor?.displayName ?? "Một thành viên";
+
+              // Known exact mappings
               switch (action) {
                 case "expense_created":
                 case "expense.create":
@@ -184,10 +187,86 @@ export default function GroupScreen() {
                 case "group_closed":
                 case "group.close":
                   return `${actor} đã quyết toán nhóm`;
-                default:
-                  // fallback: show raw action but prettier
-                  return action.replace(/_/g, " ").replace(/\./g, " ") || "Hoạt động";
               }
+
+              // If the action looks like a machine code (contains _ or . or :), try to build a Vietnamese phrase
+              if (/[_.:]/.test(action)) {
+                const normal = action.replace(/[_.:]+/g, " ").toLowerCase();
+                const tokens = normal.split(/\s+/).filter(Boolean);
+
+                const verbMap: Record<string, string> = {
+                  created: "đã thêm",
+                  create: "đã tạo",
+                  added: "đã thêm",
+                  updated: "đã cập nhật",
+                  update: "đã cập nhật",
+                  deleted: "đã xóa",
+                  removed: "đã xóa",
+                  joined: "đã tham gia",
+                  join: "đã tham gia",
+                  closed: "đã quyết toán",
+                  settle: "đã quyết toán",
+                  settlement: "quyết toán",
+                  payment: "thanh toán",
+                  paid: "đã thanh toán",
+                  refunded: "đã hoàn trả",
+                  comment: "bình luận",
+                  expense: "khoản chi",
+                  member: "thành viên",
+                  group: "nhóm",
+                };
+
+                let verb = "";
+                const objects: string[] = [];
+                for (const t of tokens) {
+                  if (!verb && verbMap[t] && /(created|create|added|updated|update|deleted|removed|joined|join|closed|settle|paid|refunded)/.test(t)) {
+                    verb = verbMap[t];
+                    continue;
+                  }
+                  // treat settlement and expense as object words
+                  if (t in verbMap && !verb) {
+                    // if it's a noun like 'expense' or 'settlement', keep for objects
+                    objects.push(verbMap[t]);
+                    continue;
+                  }
+                  // default: keep token (could be 'by' or other connector)
+                  objects.push(t);
+                }
+
+                const objectText = objects.join(" ").replace(/\s+/g, " ").trim();
+                if (verb) {
+                  return `${actor} ${verb}${objectText ? " " + objectText : ""}`.trim();
+                }
+
+                if (objectText) {
+                  // Capitalize first letter of objectText and return as short description
+                  return `${actor} ${objectText}`;
+                }
+              }
+
+              // If action is a free-form description (likely already readable), attempt small replacements
+              if (action) {
+                const replaced = action
+                  .replace(/_/g, " ")
+                  .replace(/\./g, " ")
+                  .replace(/added/gi, "đã thêm")
+                  .replace(/created/gi, "đã tạo")
+                  .replace(/updated/gi, "đã cập nhật")
+                  .replace(/joined/gi, "đã tham gia")
+                  .replace(/closed/gi, "đã quyết toán")
+                  .replace(/expense/gi, "khoản chi")
+                  .replace(/member/gi, "thành viên")
+                  .replace(/settlement/gi, "quyết toán");
+
+                // If the replaced text is short, prepend actor when it looks like an action phrase
+                if (/\b(đã|đang)\b/.test(replaced)) {
+                  return `${actor} ${replaced}`;
+                }
+
+                return replaced || "Hoạt động";
+              }
+
+              return "Hoạt động";
             };
             return (
               <TouchableOpacity
