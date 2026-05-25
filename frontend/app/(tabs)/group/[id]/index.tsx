@@ -6,16 +6,18 @@ import {
 } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Platform, ActivityIndicator } from "react-native";
 import {
+  ActivityIndicator,
+  Alert,
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
-  Alert,
 } from "react-native";
 
 import { balanceService } from "@/api/services/balance.service";
@@ -37,6 +39,8 @@ const currency = (value: number) => `${value.toLocaleString("vi-VN")}đ`;
 
 export default function GroupDetailScreen() {
   const { id, refresh } = useLocalSearchParams<{ id: string; refresh?: string }>();
+  const { width } = useWindowDimensions();
+  const useStackedActions = width < 390;
 
   const currentUser = useAuthStore((state) => state.user);
   const fetchMe = useAuthStore((state) => state.fetchMe);
@@ -297,7 +301,10 @@ export default function GroupDetailScreen() {
         <View style={styles.actionRow}>
           <Pressable
             onPress={() => router.push(`/group/${id}/add-expense`) }
-            style={styles.actionButtonPrimary}
+            style={[
+              styles.actionButtonPrimary,
+              useStackedActions && styles.actionButtonWide,
+            ]}
           >
             <MaterialIcons name="add-card" size={18} color="#FFFFFF" />
 
@@ -739,6 +746,7 @@ const styles = StyleSheet.create({
 
   actionRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
   },
 
@@ -752,11 +760,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
+    minHeight: 48,
+  },
+
+  actionButtonWide: {
+    flexBasis: "100%",
   },
 
   actionButtonPrimaryText: {
     color: "#FFFFFF",
     fontWeight: "800",
+    flexShrink: 1,
+    textAlign: "center",
   },
 
   actionButtonSecondary: {
@@ -771,11 +786,15 @@ const styles = StyleSheet.create({
     gap: 8,
     borderWidth: 1,
     borderColor: "#D1D5DB",
+    minHeight: 48,
+    minWidth: 0,
   },
 
   actionButtonSecondaryText: {
     color: "#0F172A",
     fontWeight: "800",
+    flexShrink: 1,
+    textAlign: "center",
   },
 
   sectionCard: {
