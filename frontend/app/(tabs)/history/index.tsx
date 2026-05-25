@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { activityService } from "@/api/services/activity.service";
@@ -7,6 +7,8 @@ import { groupService } from "@/api/services/group.service";
 import type { AuditLog } from "@/api/types/activity";
 import type { Group } from "@/api/types/group";
 import TopAppBar from "@/components/TopAppBar";
+import { useTabCacheRefresh } from "@/hooks/useTabCacheRefresh";
+import { useHistoryStore } from "@/store/history.store";
 
 type HistoryItem = AuditLog & {
   actor?: {
@@ -65,36 +67,54 @@ export default function HistoryScreen() {
   const [transactions, setTransactions] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const getHistoryCacheEntry = useHistoryStore((s) => s.getCacheEntry);
+  const setHistoryCache = useHistoryStore((s) => s.setCache);
+  const invalidateHistoryCache = useHistoryStore((s) => s.invalidate);
 
-  useEffect(() => {
-    const loadTransactions = async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const groupData = await groupService.getGroups();
-
-        const selectedGroup = groupData.find((group) => group.status === "active") ?? groupData[0] ?? null;
-        setActiveGroup(selectedGroup);
-
-        if (!selectedGroup) {
-          setTransactions([]);
-          return;
-        }
-
-        const history = await activityService.getHistory(selectedGroup.id);
-        setTransactions(history.items as HistoryItem[]);
-      } catch (fetchError) {
-        console.log("Get history error:", fetchError);
-        setError("Không thể tải lịch sử.");
-        setTransactions([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadTransactions();
+  const applyHistoryCache = useCallback((data: { activeGroup: Group | null; transactions: HistoryItem[] }) => {
+    setActiveGroup(data.activeGroup ?? null);
+    setTransactions(data.transactions ?? []);
+    setError(null);
   }, []);
+
+  const refreshHistory = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) setLoading(true);
+    setError(null);
+
+    try {
+      const groupData = await groupService.getGroups();
+      const selectedGroup = groupData.find((group) => group.status === "active") ?? groupData[0] ?? null;
+
+      if (!selectedGroup) {
+        const empty = { activeGroup: null, transactions: [] };
+        applyHistoryCache(empty);
+        setHistoryCache(empty);
+        return;
+      }
+
+      const history = await activityService.getHistory(selectedGroup.id);
+      const data = { activeGroup: selectedGroup, transactions: history.items as HistoryItem[] };
+      applyHistoryCache(data);
+      setHistoryCache(data);
+    } catch (fetchError) {
+      console.log("Get history error:", fetchError);
+      setError("Không thể tải lịch sử.");
+      applyHistoryCache({ activeGroup: null, transactions: [] });
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, [applyHistoryCache, setHistoryCache]);
+
+  useTabCacheRefresh({
+    getCacheEntry: getHistoryCacheEntry,
+    applyCache: applyHistoryCache,
+    refresh: refreshHistory,
+  });
+
+  const reloadAndInvalidate = useCallback(async () => {
+    invalidateHistoryCache();
+    await refreshHistory({ silent: true });
+  }, [invalidateHistoryCache, refreshHistory]);
 
   const groupedTransactions = useMemo(() => {
     const sorted = [...transactions].sort(

@@ -4,9 +4,11 @@ import { AntDesign, MaterialIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -16,9 +18,11 @@ import {
 
 import { groupService } from "@/api/services/group.service";
 import { GroupMember } from "@/api/types/group";
+import { useGroupStore } from "@/store/group.store";
+import { useHomeStore } from "@/store/home.store";
 
 import { expenseService } from "@/api/services/expense.service";
-import { CreateExpenseRequest, SplitMode } from "@/api/types/expense";
+import { CreateExpenseRequest } from "@/api/types/expense";
 
 const splitModes = ["CHIA ĐỀU", "SỐ TIỀN", "%"] as const;
 
@@ -32,6 +36,11 @@ export default function AddExpenseScreen() {
   const [payer, setPayer] = useState("");
   const [showPayerModal, setShowPayerModal] = useState(false);
   const [payerId, setPayerId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [feedback, setFeedback] = useState<{
+    type: "error" | "success";
+    message: string;
+  } | null>(null);
 
   const [members, setMembers] = useState<GroupMember[]>([]);
 
@@ -43,6 +52,7 @@ export default function AddExpenseScreen() {
 
   const parsedAmount = Number(amount.replace(/[^0-9]/g, "")) || 0;
   const selectedCount = selectedParticipantIds.length || 1;
+  const groupId = Array.isArray(id) ? id[0] : id;
 
   const perPersonAmount = useMemo(() => {
     if (!selectedCount) return 0;
@@ -59,91 +69,122 @@ export default function AddExpenseScreen() {
     );
   };
 
+  const goBackToGroupDetail = () => {
+    if (groupId) {
+      router.replace(`/group/${groupId}?refresh=${Date.now()}` as any);
+      return;
+    }
+
+    router.back();
+  };
+
+  const showFeedback = (
+    type: "error" | "success",
+    title: string,
+    message: string,
+  ) => {
+    setFeedback({ type, message });
+
+    if (Platform.OS === "web") {
+      window.alert(message);
+      return;
+    }
+
+    Alert.alert(title, message);
+  };
+
   const handleSave = async () => {
+    if (isSaving) return;
+
     try {
+      setFeedback(null);
+
+      if (!groupId) {
+        showFeedback("error", "Lỗi", "Không tìm thấy nhóm để tạo khoản chi.");
+        return;
+      }
+
       if (!expenseName.trim()) {
-        Alert.alert("Thiếu thông tin", "Vui lòng nhập tên khoản chi.");
+        showFeedback("error", "Thiếu thông tin", "Vui lòng nhập tên khoản chi.");
         return;
       }
 
       if (!parsedAmount) {
-        Alert.alert("Thiếu thông tin", "Vui lòng nhập số tiền hợp lệ.");
+        showFeedback("error", "Thiếu thông tin", "Vui lòng nhập số tiền hợp lệ.");
         return;
       }
 
-      if (!payer) {
-        Alert.alert("Thiếu thông tin", "Vui lòng chọn người trả.");
+      const selectedPayerId =
+        payerId || members.find((member) => member.displayName === payer)?.userId;
+
+      if (!selectedPayerId) {
+        showFeedback("error", "Thiếu thông tin", "Vui lòng chọn người trả.");
         return;
       }
 
       if (selectedParticipantIds.length === 0) {
-        Alert.alert(
-          "Thiếu thông tin",
-          "Vui lòng chọn ít nhất 1 người tham gia.",
-        );
+        showFeedback("error", "Thiếu thông tin", "Vui lòng chọn ít nhất 1 người tham gia.");
         return;
       }
 
-      let splitModeValue: SplitMode = "equal";
+      setIsSaving(true);
 
-      switch (splitMode) {
-        case "CHIA ĐỀU":
-          splitModeValue = "equal";
-          break;
-
-        case "SỐ TIỀN":
-          splitModeValue = "amount";
-          break;
-
-        case "%":
-          splitModeValue = "percent";
-          break;
-      }
-
-      // compute participant values for payload
-      let participants: { userId: string; value: number }[] = [];
-
-      if (splitModeValue === "equal") {
-        const base = Math.floor(parsedAmount / selectedParticipantIds.length);
-        let remainder = parsedAmount - base * selectedParticipantIds.length;
-        participants = selectedParticipantIds.map((userId) => {
-          const val = base + (remainder > 0 ? 1 : 0);
-          if (remainder > 0) remainder -= 1;
-          return { userId, value: val };
-        });
-      } else {
-        // amount/percent modes not fully supported in UI yet — fallback to equal shares
-        participants = selectedParticipantIds.map((userId) => ({ userId, value: perPersonAmount }));
-      }
+      const base = Math.floor(parsedAmount / selectedParticipantIds.length);
+      let remainder = parsedAmount - base * selectedParticipantIds.length;
+      const participants = selectedParticipantIds.map((userId) => {
+        const value = base + (remainder > 0 ? 1 : 0);
+        if (remainder > 0) remainder -= 1;
+        return { userId, value };
+      });
 
       const payload: CreateExpenseRequest = {
-        description: expenseName,
+        description: expenseName.trim(),
         amount: parsedAmount,
         currency: "VND",
-        paidByUserId: payerId || members.find((m) => m.displayName === payer)?.userId || "",
-        splitMode: splitModeValue,
+        paidByUserId: selectedPayerId,
+        splitMode: "equal",
         participants,
       };
 
-      await expenseService.createExpense(String(id), payload);
+      await expenseService.createExpense(groupId, payload);
+
+      useGroupStore.getState().invalidateGroupCache(groupId);
+      useGroupStore.getState().invalidateGroupListCache();
+      useHomeStore.getState().invalidate();
+
+      setFeedback({ type: "success", message: "Tạo khoản chi thành công." });
+
+      if (Platform.OS === "web") {
+        window.alert("Tạo khoản chi thành công.");
+        goBackToGroupDetail();
+        return;
+      }
 
       Alert.alert("Thành công", "Tạo khoản chi thành công.", [
         {
           text: "OK",
-          onPress: () => router.back(),
+          onPress: goBackToGroupDetail,
         },
       ]);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Create expense error:", error);
 
-      Alert.alert("Lỗi", "Không thể tạo khoản chi.");
+      const message =
+        error?.response?.data?.error?.message ||
+        error?.response?.data?.message ||
+        "Không thể tạo khoản chi.";
+      showFeedback("error", "Lỗi", message);
+    } finally {
+      setIsSaving(false);
     }
   };
 
   useEffect(() => {
     const fetchGroupMembers = async () => {
       try {
-        const response = await groupService.getGroupMembers(String(id));
+        if (!groupId) return;
+
+        const response = await groupService.getGroupMembers(groupId);
 
         setMembers(response);
 
@@ -159,11 +200,11 @@ export default function AddExpenseScreen() {
     };
 
     fetchGroupMembers();
-  }, [id]);
+  }, [groupId]);
 
   return (
     <View style={{ flex: 1, backgroundColor: "#F3F4F6" }}>
-      <TopAppBar title="Thêm khoản chi" showBack />
+      <TopAppBar title="Thêm khoản chi" showBack onBackPress={goBackToGroupDetail} />
       <ScrollView
         contentContainerStyle={{
           paddingTop: 12,
@@ -173,6 +214,26 @@ export default function AddExpenseScreen() {
         }}
       >
         <View style={{ gap: 12 }}>
+          {feedback ? (
+            <View
+              style={{
+                backgroundColor: feedback.type === "success" ? "#E8F7EE" : "#FDECEC",
+                borderRadius: 14,
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+              }}
+            >
+              <Text
+                style={{
+                  color: feedback.type === "success" ? "#0F5E28" : "#B91C1C",
+                  fontWeight: "700",
+                }}
+              >
+                {feedback.message}
+              </Text>
+            </View>
+          ) : null}
+
           <View>
             <Text
               style={{
@@ -571,9 +632,10 @@ export default function AddExpenseScreen() {
 
           <Pressable
             onPress={handleSave}
+            disabled={isSaving}
             style={({ pressed }) => ({
               marginTop: 8,
-              backgroundColor: pressed ? "#166534" : darkGreen,
+              backgroundColor: isSaving ? "#6B7280" : pressed ? "#166534" : darkGreen,
               borderRadius: 16,
               paddingVertical: 16,
               alignItems: "center",
@@ -582,8 +644,17 @@ export default function AddExpenseScreen() {
               gap: 10,
             })}
           >
-            <AntDesign name="save" size={18} color="white" />
-            <Text style={{ color: "white", fontWeight: "800", fontSize: 16 }}>
+            {isSaving ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <AntDesign name="save" size={18} color="white" />
+            )}
+            {isSaving ? (
+              <Text style={{ color: "white", fontWeight: "800", fontSize: 16 }}>
+                Đang lưu...
+              </Text>
+            ) : null}
+            <Text style={{ color: "white", fontWeight: "800", fontSize: 16, display: isSaving ? "none" : "flex" }}>
               Lưu khoản chi
             </Text>
           </Pressable>

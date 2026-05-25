@@ -91,7 +91,7 @@ export default function NavigationBar() {
               styles.item,
               isActive && { backgroundColor: "rgba(34, 197, 94, 0.08)" },
             ]}
-            onPress={() => router.push(item.route as any)}
+            onPress={() => router.navigate(item.route as any)}
           >
             <View
               style={[

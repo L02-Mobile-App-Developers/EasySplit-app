@@ -31,11 +31,12 @@ import type { DebtEdge } from "@/api/types/settlement";
 
 import { useAuthStore } from "@/store/auth.store";
 import { useGroupStore } from "@/store/group.store";
+import { useHomeStore } from "@/store/home.store";
 
 const currency = (value: number) => `${value.toLocaleString("vi-VN")}đ`;
 
 export default function GroupDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, refresh } = useLocalSearchParams<{ id: string; refresh?: string }>();
 
   const currentUser = useAuthStore((state) => state.user);
   const fetchMe = useAuthStore((state) => state.fetchMe);
@@ -46,6 +47,7 @@ export default function GroupDetailScreen() {
   const [myBalance, setMyBalance] = useState<Balance>();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
+  const [refreshingDetail, setRefreshingDetail] = useState(false);
 
   const [memberToPay, setMemberToPay] = useState<DebtEdge[]>([]);
   const [debts, setDebts] = useState<DebtEdge[]>([]);
@@ -53,16 +55,17 @@ export default function GroupDetailScreen() {
   const [historyLoading, setHistoryLoading] = useState(false);
 
   const cachedRole = useGroupStore((s) => (id ? s.roles[id as string] : undefined));
-  const getGroupCacheEntry = useGroupStore((s) => (s as any).getGroupCacheEntry);
+  const getGroupCacheEntry = useGroupStore((s) => s.getGroupCacheEntry);
   const setGroupCache = useGroupStore((s) => s.setGroupCache);
   useEffect(() => {
     if (!id) return;
 
     // Try to load cached data first
     const cacheEntry = getGroupCacheEntry?.(id as string);
+    const shouldBypassCache = Boolean(refresh);
     const TTL = 30 * 1000; // 30 seconds
     const now = Date.now();
-    if (cacheEntry) {
+    if (cacheEntry && !shouldBypassCache) {
       const { data, ts } = cacheEntry as any;
       setGroup(data.group ?? undefined);
       setMembers(data.members ?? []);
@@ -100,6 +103,7 @@ export default function GroupDetailScreen() {
     } else {
       // no cache - fetch immediately
       (async () => {
+        setRefreshingDetail(true);
         try {
           const [groupData, membersData, expensePage, balanceData, debtData] = await Promise.all([
             groupService.getGroup(id),
@@ -118,6 +122,8 @@ export default function GroupDetailScreen() {
           setGroupCache(id, { group: groupData, members: membersData, expenses: expensePage.items, myBalance: balanceData, debts: debtData });
         } catch (error) {
           console.error("Failed to load group detail:", error);
+        } finally {
+          setRefreshingDetail(false);
         }
       })();
     }
@@ -146,7 +152,7 @@ export default function GroupDetailScreen() {
       }
     };
     fetchHistory();
-  }, [id]);
+  }, [id, refresh]);
 
   useEffect(() => {
     // ensure we have current user loaded so action buttons (leave) can work
@@ -154,6 +160,37 @@ export default function GroupDetailScreen() {
       fetchMe().catch(() => {});
     }
   }, [currentUser, fetchMe]);
+
+  const localizeAction = (action?: string) => {
+    if (!action) return "Hoạt động";
+
+    switch (String(action)) {
+      case "group_created":
+        return "Đã tạo nhóm";
+      case "expense_created":
+        return "Đã thêm khoản chi";
+      case "expense_updated":
+        return "Đã cập nhật khoản chi";
+      case "expense_deleted":
+        return "Đã xóa khoản chi";
+      case "member_added":
+        return "Đã thêm thành viên";
+      case "member_removed":
+        return "Đã xóa thành viên";
+      case "settlement_created":
+        return "Đã tạo phiếu thanh toán";
+      case "smart_settle":
+        return "Đã thực hiện thanh toán thông minh";
+      case "group_settlement_committed":
+        return "Đã xác nhận thanh toán nhóm";
+      case "reminder_created":
+        return "Đã tạo nhắc nhở";
+      default: {
+        const cleaned = String(action).replace(/_|\./g, " ");
+        return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+      }
+    }
+  };
 
   const effectiveRole = group?.role ?? cachedRole;
 
@@ -180,7 +217,14 @@ export default function GroupDetailScreen() {
 
   return (
     <View style={styles.screen}>
-      <TopAppBar title="Chi tiết nhóm" showBack />
+      <TopAppBar title="Chi tiết nhóm" showBack onBackPress={() => router.replace("/group")} />
+
+      {refreshingDetail ? (
+        <View style={styles.refreshBanner}>
+          <ActivityIndicator size="small" color="#0F5E28" />
+          <Text style={styles.refreshBannerText}>Đang cập nhật dữ liệu...</Text>
+        </View>
+      ) : null}
 
       <ScrollView contentContainerStyle={styles.content}>
         {/* HERO */}
@@ -294,6 +338,8 @@ export default function GroupDetailScreen() {
                       setIsDeleting(true);
                       try {
                         await groupService.deleteGroup(id as string);
+                        useGroupStore.getState().invalidateGroupListCache();
+                        useHomeStore.getState().invalidate();
                         if (Platform.OS === "web") {
                           window.alert("Nhóm đã được xóa");
                           router.replace("/group");
@@ -356,6 +402,8 @@ export default function GroupDetailScreen() {
                     setIsLeaving(true);
                     try {
                       await groupService.removeGroupMember(id as string, currentUser?.id as string);
+                      useGroupStore.getState().invalidateGroupListCache();
+                      useHomeStore.getState().invalidate();
                       if (Platform.OS === "web") {
                         window.alert("Bạn đã rời nhóm");
                         router.replace("/group");
@@ -497,7 +545,7 @@ export default function GroupDetailScreen() {
               {history.length === 0 && <Text style={{ color: "#6B7280" }}>Chưa có lịch sử</Text>}
               {history.map((h) => (
                 <View key={h.id} style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#F3F4F6" }}>
-                  <Text style={{ fontWeight: "700" }}>{h.actor?.displayName ?? "Một thành viên"} • {String(h.action).replace(/_|\./g, ' ')}</Text>
+                  <Text style={{ fontWeight: "700" }}>{h.actor?.displayName ?? "Một thành viên"} • {localizeAction(h.action)}</Text>
                   <Text style={{ color: "#6B7280", marginTop: 4 }}>{new Date(h.createdAt).toLocaleString()}</Text>
                 </View>
               ))}
@@ -551,6 +599,20 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: "#F4F7F4",
+  },
+
+  refreshBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 10,
+    backgroundColor: "#EAF6EE",
+  },
+
+  refreshBannerText: {
+    color: "#0F5E28",
+    fontWeight: "700",
   },
 
   content: {

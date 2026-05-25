@@ -1,16 +1,18 @@
 import { AntDesign, MaterialIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
-import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { useCallback, useMemo, useState } from "react";
+import { ScrollView, StyleSheet, TouchableOpacity, View, ActivityIndicator } from "react-native";
 
 import { activityService } from "@/api/services/activity.service";
 import { balanceService } from "@/api/services/balance.service";
 import { groupService } from "@/api/services/group.service";
+import { useHomeStore } from "@/store/home.store";
 import type { Group } from "@/api/types/group";
 import TopAppBar from "@/components/TopAppBar";
 import { ThemedText } from "@/components/ThemedText";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { useTabCacheRefresh } from "@/hooks/useTabCacheRefresh";
 
 type HomeActivity = {
   id: string;
@@ -21,7 +23,15 @@ type HomeActivity = {
   type: "received" | "paid";
 };
 
-type HomeGroup = Pick<Group, "id" | "name" | "memberCount" | "status">;
+type HomeGroup = Pick<Group, "id" | "name" | "memberCount" | "status" | "latestActivity">;
+
+type HomeData = {
+  groups: HomeGroup[];
+  recentActivities: HomeActivity[];
+  netBalance: number;
+  owedBalance: number;
+  receivableBalance: number;
+};
 
 const quickActions = [
   {
@@ -47,68 +57,105 @@ export default function Index() {
   const [receivableBalance, setReceivableBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const getHomeCacheEntry = useHomeStore((s) => s.getCacheEntry);
+  const setHomeCache = useHomeStore((s) => s.setCache);
 
-  useEffect(() => {
-    const loadHome = async () => {
-      setLoading(true);
+  const applyHomeCache = useCallback((data: HomeData, options: { clearError?: boolean } = {}) => {
+    setGroups(data.groups ?? []);
+    setRecentActivities(data.recentActivities ?? []);
+    setNetBalance(data.netBalance ?? 0);
+    setOwedBalance(data.owedBalance ?? 0);
+    setReceivableBalance(data.receivableBalance ?? 0);
+    if (options.clearError !== false) {
+      setError(null);
+    }
+  }, []);
+
+  const refreshHome = useCallback(
+    async ({ silent = false }: { silent?: boolean } = {}) => {
+      if (!silent) setLoading(true);
       setError(null);
 
       try {
         const groupList = await groupService.getGroups();
-        const scopedGroups = groupList.slice(0, 2) as HomeGroup[];
+        const allGroups = groupList as HomeGroup[];
+        const scopedGroups = allGroups.slice(0, 2);
 
-        setGroups(scopedGroups);
-
-        if (scopedGroups.length === 0) {
-          setRecentActivities([]);
-          setNetBalance(0);
-          setOwedBalance(0);
-          setReceivableBalance(0);
+        if (allGroups.length === 0) {
+          const empty = { groups: [], recentActivities: [], netBalance: 0, owedBalance: 0, receivableBalance: 0 };
+          applyHomeCache(empty);
+          setHomeCache(empty);
           return;
         }
 
-        const results = await Promise.all(
-          scopedGroups.map(async (group) => {
-            const [myBalance, activities] = await Promise.all([
-              balanceService.getMyBalance(group.id),
-              activityService.getActivities(group.id, { page: 1, limit: 1 }),
-            ]);
+        const balanceResults = await Promise.allSettled(
+          allGroups.map(async (group) => {
+            const myBalance = await balanceService.getMyBalance(group.id);
+            return normalizeMoney(myBalance.balance);
+          }),
+        );
+        const balances = balanceResults.map((result) =>
+          result.status === "fulfilled" ? result.value : 0,
+        );
+        const hasBalanceError = balanceResults.some((result) => result.status === "rejected");
 
-            return {
-              group,
-              myBalance,
-              latestActivity: activities.items?.[0] ?? null,
-            };
+        const net = balances.reduce((sum, current) => sum + current, 0);
+        const rec = balances.filter((value) => value > 0).reduce((sum, current) => sum + current, 0);
+        const owed = Math.abs(balances.filter((value) => value < 0).reduce((sum, current) => sum + current, 0));
+
+        const activityResults = await Promise.all(
+          scopedGroups.map(async (group) => {
+            try {
+              const activities = await activityService.getActivities(group.id, { page: 1, limit: 1 });
+              return {
+                group,
+                latestActivity: activities.items?.[0] ?? group.latestActivity ?? null,
+              };
+            } catch {
+              return {
+                group,
+                latestActivity: group.latestActivity ?? null,
+              };
+            }
           }),
         );
 
-        const balances = results.map((item) => item.myBalance.balance ?? 0);
-        setNetBalance(balances.reduce((sum, current) => sum + current, 0));
-        setReceivableBalance(balances.filter((value) => value > 0).reduce((sum, current) => sum + current, 0));
-        setOwedBalance(Math.abs(balances.filter((value) => value < 0).reduce((sum, current) => sum + current, 0)));
+        const activities: Array<HomeActivity & { sortKey: number }> = [];
+        activityResults.forEach((result) => {
+          if (result.latestActivity) {
+            activities.push(mapHomeActivity(result.group, result.latestActivity));
+          }
+        });
 
-        const activities = results
-          .filter((item) => Boolean(item.latestActivity))
-          .map((item) => mapHomeActivity(item.group, item.latestActivity));
+        const recent = activities.sort((left, right) => right.sortKey - left.sortKey).slice(0, 3);
+        const nextData = { groups: scopedGroups, recentActivities: recent, netBalance: net, owedBalance: owed, receivableBalance: rec };
 
-        setRecentActivities(
-          activities.sort((left, right) => right.sortKey - left.sortKey).slice(0, 3),
-        );
+        applyHomeCache(nextData, { clearError: !hasBalanceError });
+        if (hasBalanceError) {
+          setError("Không thể tải đầy đủ số dư trang chủ.");
+        }
+        setHomeCache(nextData);
       } catch (fetchError) {
         console.log("Get home data error:", fetchError);
         setError("Không thể tải dữ liệu trang chủ.");
-        setGroups([]);
-        setRecentActivities([]);
-        setNetBalance(0);
-        setOwedBalance(0);
-        setReceivableBalance(0);
+        const cachedData = getHomeCacheEntry()?.data;
+        applyHomeCache(
+          cachedData ?? { groups: [], recentActivities: [], netBalance: 0, owedBalance: 0, receivableBalance: 0 },
+          { clearError: false },
+        );
       } finally {
-        setLoading(false);
+        if (!silent) setLoading(false);
       }
-    };
+    },
+    [applyHomeCache, getHomeCacheEntry, setHomeCache],
+  );
 
-    loadHome();
-  }, []);
+  useTabCacheRefresh({
+    getCacheEntry: getHomeCacheEntry,
+    applyCache: applyHomeCache,
+    refresh: refreshHome,
+    ttlMs: 0,
+  });
 
   const money = useMemo(() => Math.abs(netBalance), [netBalance]);
 
@@ -129,7 +176,13 @@ export default function Index() {
         onSettingsPress={handleSettings}
       />
 
-      <ScrollView contentContainerStyle={styles.page}>
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 40 }}>
+          <ActivityIndicator size="large" color={successGreen} />
+          <ThemedText style={{ marginTop: 12 }}>Đang tải trang chủ...</ThemedText>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.page}>
         {error ? (
           <View style={styles.errorCard}>
             <ThemedText fontWeight="semibold" style={styles.errorText}>
@@ -235,16 +288,17 @@ export default function Index() {
             </View>
           ))}
         </View>
-      </ScrollView>
+        </ScrollView>
+      )}
     </>
   );
 }
 
-function mapHomeActivity(group: HomeGroup, activity: any) {
+function mapHomeActivity(group: HomeGroup, activity: any): HomeActivity & { sortKey: number } {
   const description = activity.description ?? activity.title ?? activity.action ?? `${group.name} có hoạt động mới`;
   const createdAt = activity.createdAt ?? activity.time ?? new Date().toISOString();
   const money = typeof activity.amount === "number" ? activity.amount : typeof activity.money === "number" ? activity.money : 0;
-  const type = money >= 0 ? "received" : "paid";
+  const type: HomeActivity["type"] = money >= 0 ? "received" : "paid";
 
   return {
     id: String(activity.id ?? `${group.id}-${createdAt}`),
@@ -255,6 +309,11 @@ function mapHomeActivity(group: HomeGroup, activity: any) {
     type,
     sortKey: new Date(createdAt).getTime(),
   };
+}
+
+function normalizeMoney(value: unknown) {
+  const amount = typeof value === "number" ? value : Number(value ?? 0);
+  return Number.isFinite(amount) ? amount : 0;
 }
 
 function formatRelativeTime(value: string) {

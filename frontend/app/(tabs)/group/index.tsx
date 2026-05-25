@@ -1,6 +1,6 @@
 import { AntDesign, EvilIcons, MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -13,8 +13,8 @@ import {
 
 import TopAppBar from "@/components/TopAppBar";
 import { useAppTheme } from "@/hooks/useAppTheme";
-import { activityService } from "@/api/services/activity.service";
 import { groupService } from "@/api/services/group.service";
+import { useTabCacheRefresh } from "@/hooks/useTabCacheRefresh";
 import { useGroupStore } from "@/store/group.store";
 import type { Group } from "@/api/types/group";
 
@@ -31,39 +31,44 @@ export default function GroupScreen() {
   const [activitiesMap, setActivitiesMap] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const getGroupListCacheEntry = useGroupStore((s) => s.getGroupListCacheEntry);
+  const setGroupListCache = useGroupStore((s) => s.setGroupListCache);
 
   const { lightGray, tabIconDefault, backgroundWhite, textColor, successGreen, errorRed, lightGreen, darkGreen } = useAppTheme();
 
-  const fetchGroups = async () => {
+  const applyGroupListCache = useCallback((data: Group[]) => {
+    setGroups(data);
+    const aMap: Record<string, any> = {};
+    const map: Record<string, string | undefined> = {};
+    data.forEach((g) => {
+      map[g.id] = g.role;
+      if ((g as any).latestActivity) {
+        aMap[g.id] = (g as any).latestActivity;
+      }
+    });
+    useGroupStore.getState().setRoles(map);
+    setActivitiesMap(aMap);
+  }, []);
+
+  const refreshGroups = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) setLoading(true);
     try {
       const data = await groupService.getGroups();
-      setGroups(data);
-      // cache latest activity from backend and membership roles for faster rendering
-      const aMap: Record<string, any> = {};
-      const map: Record<string, string | undefined> = {};
-      data.forEach((g) => {
-        map[g.id] = g.role;
-        if ((g as any).latestActivity) {
-          aMap[g.id] = (g as any).latestActivity;
-        }
-      });
-      useGroupStore.getState().setRoles(map);
-      setActivitiesMap(aMap);
+      applyGroupListCache(data as Group[]);
+      setGroupListCache(data as Group[]);
     } catch (error) {
       console.log("Get groups error:", error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [applyGroupListCache, setGroupListCache]);
 
-  useEffect(() => {
-    fetchGroups();
-  }, []);
-
-  useEffect(() => {
-    // latestActivity is provided by the backend in getGroups; nothing to do here
-  }, [groups]);
+  useTabCacheRefresh({
+    getCacheEntry: getGroupListCacheEntry,
+    applyCache: applyGroupListCache,
+    refresh: refreshGroups,
+  });
 
   const filteredGroups = useMemo(() => {
     return groups.filter((group) => {
@@ -93,7 +98,7 @@ export default function GroupScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchGroups();
+    await refreshGroups({ silent: true });
   };
 
   return (

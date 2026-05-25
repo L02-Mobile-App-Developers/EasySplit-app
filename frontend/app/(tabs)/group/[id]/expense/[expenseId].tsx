@@ -2,11 +2,16 @@ import TopAppBar from "@/components/TopAppBar";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useLocalSearchParams, router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 
 import { expenseService } from "@/api/services/expense.service";
+import { groupService } from "@/api/services/group.service";
+import { balanceService } from "@/api/services/balance.service";
+import { settlementService } from "@/api/services/settlement.service";
 import type { Expense } from "@/api/types/expense";
+import { useGroupStore } from "@/store/group.store";
+import { useHomeStore } from "@/store/home.store";
 
 export default function ExpenseDetailScreen() {
   const { id, expenseId } = useLocalSearchParams<{ id: string; expenseId: string }>();
@@ -34,6 +39,8 @@ export default function ExpenseDetailScreen() {
     if (!expense || !expense.participants || expense.participants.length === 0) return 0;
     return Math.floor(expense.amount / expense.participants.length);
   }, [expense]);
+
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const splitLabel = useMemo(() => {
     if (!expense) return "Chia đều";
@@ -71,9 +78,18 @@ export default function ExpenseDetailScreen() {
       </View>
     );
   }
+  const goBackToGroupDetail = () => {
+    if (id) {
+      router.replace(`/group/${id}` as any);
+      return;
+    }
+
+    router.back();
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: backgroundWhite }}>
-      <TopAppBar title="Chi tiết khoản chi" showBack />
+      <TopAppBar title="Chi tiết khoản chi" showBack onBackPress={goBackToGroupDetail} />
       <ScrollView contentContainerStyle={{ paddingTop: 12, paddingHorizontal: 20, paddingBottom: 40 }}>
         <View style={{ backgroundColor: backgroundWhite, borderRadius: 12, padding: 20, marginBottom: 16 }}>
           <View style={{ alignItems: "center", marginBottom: 12 }}>
@@ -137,8 +153,81 @@ export default function ExpenseDetailScreen() {
           <TouchableOpacity onPress={() => {}} style={{ backgroundColor: "#E6EEF9", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, flex: 1, alignItems: "center" }}>
             <Text style={{ color: "#374151", fontWeight: "700" }}>Chỉnh sửa</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => { /* TODO: delete */ }} style={{ backgroundColor: "#FEE2E2", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, flex: 1, alignItems: "center" }}>
-            <Text style={{ color: "#B91C1C", fontWeight: "700" }}>Xóa</Text>
+          <TouchableOpacity
+            onPress={async () => {
+              if (!id || !expenseId || isDeleting) return;
+
+              const confirmMsg = "Bạn có chắc muốn xóa khoản chi này? Hành động không thể hoàn tác.";
+
+              const doDelete = async () => {
+                try {
+                  setIsDeleting(true);
+                  const groupId = String(id);
+                  const refreshTarget = `/group/${groupId}?refresh=${Date.now()}`;
+
+                  await expenseService.deleteExpense(groupId, String(expenseId));
+
+                  // Refresh group-related data so group detail shows latest expenses
+                  try {
+                    const [groupData, membersData, expensePage, balanceData, debtData] = await Promise.all([
+                      groupService.getGroup(groupId),
+                      groupService.getGroupMembers(groupId),
+                      expenseService.getExpenses(groupId),
+                      balanceService.getMyBalance(groupId),
+                      settlementService.getDebts(groupId),
+                    ]);
+
+                    useGroupStore.getState().setGroupCache(groupId, {
+                      group: groupData,
+                      members: membersData,
+                      expenses: expensePage.items,
+                      myBalance: balanceData,
+                      debts: debtData,
+                    });
+                  } catch (e) {
+                    console.error("Failed to refresh group data after delete:", e);
+                    // fallback: invalidate cache so detail will fetch on mount
+                    useGroupStore.getState().invalidateGroupCache(groupId);
+                  }
+
+                  useGroupStore.getState().invalidateGroupListCache();
+                  useHomeStore.getState().invalidate();
+
+                  if (Platform.OS === "web") {
+                    window.alert("Khoản chi đã được xóa");
+                    router.replace(refreshTarget as any);
+                  } else {
+                    Alert.alert("Đã xóa", "Khoản chi đã được xóa", [
+                      { text: "OK", onPress: () => router.replace(refreshTarget as any) },
+                    ]);
+                  }
+                } catch (err) {
+                  console.error("Delete expense error:", err);
+                  const msg = (err as any)?.response?.data?.message ?? "Không thể xóa khoản chi, thử lại sau.";
+                  if (Platform.OS === "web") window.alert(msg);
+                  else Alert.alert("Lỗi", msg);
+                } finally {
+                  setIsDeleting(false);
+                }
+              };
+
+              if (Platform.OS === "web") {
+                if (window.confirm(confirmMsg)) await doDelete();
+              } else {
+                Alert.alert("Xóa khoản chi", confirmMsg, [
+                  { text: "Hủy", style: "cancel" },
+                  { text: "Xóa", style: "destructive", onPress: doDelete },
+                ]);
+              }
+            }}
+            disabled={isDeleting}
+            style={{ backgroundColor: "#FEE2E2", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, flex: 1, alignItems: "center" }}
+          >
+            {isDeleting ? (
+              <ActivityIndicator color="#B91C1C" />
+            ) : (
+              <Text style={{ color: "#B91C1C", fontWeight: "700" }}>Xóa</Text>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>

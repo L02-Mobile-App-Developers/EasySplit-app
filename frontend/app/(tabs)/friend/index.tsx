@@ -1,10 +1,11 @@
 import { AntDesign, MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert, Platform } from "react-native";
 
 import TopAppBar from "@/components/TopAppBar";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { useTabCacheRefresh } from "@/hooks/useTabCacheRefresh";
 import {
   acceptFriendRequest,
   listFriends,
@@ -12,6 +13,7 @@ import {
   rejectFriendRequest,
   unfriend,
 } from "@/api/services/friend.service";
+import { useFriendStore } from "@/store/friend.store";
 
 type FriendItem = {
   id: string;
@@ -44,34 +46,46 @@ export default function FriendScreen() {
   const [loading, setLoading] = useState(true);
   const [mutatingId, setMutatingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const getFriendCacheEntry = useFriendStore((s) => s.getCacheEntry);
+  const setFriendCache = useFriendStore((s) => s.setCache);
+  const invalidateFriendCache = useFriendStore((s) => s.invalidate);
 
-  const loadFriends = async () => {
-    setLoading(true);
+  const applyFriendCache = useCallback((data: { friends: FriendItem[]; requests: FriendRequestItem[] }) => {
+    setFriends(data.friends ?? []);
+    setRequests(data.requests ?? []);
+    setError(null);
+  }, []);
+
+  const refreshFriends = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) setLoading(true);
     setError(null);
 
     try {
       const [friendItems, requestItems] = await Promise.all([listFriends(), listIncomingRequests()]);
-      setFriends(friendItems as FriendItem[]);
-      setRequests(requestItems as FriendRequestItem[]);
+      const data = { friends: friendItems as FriendItem[], requests: requestItems as FriendRequestItem[] };
+      applyFriendCache(data);
+      setFriendCache(data);
     } catch (fetchError) {
       console.log("Get friends error:", fetchError);
       setError("Không thể tải danh sách bạn bè.");
-      setFriends([]);
-      setRequests([]);
+      applyFriendCache({ friends: [], requests: [] });
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  };
+  }, [applyFriendCache, setFriendCache]);
 
-  useEffect(() => {
-    loadFriends();
-  }, []);
+  useTabCacheRefresh({
+    getCacheEntry: getFriendCacheEntry,
+    applyCache: applyFriendCache,
+    refresh: refreshFriends,
+  });
 
   const handleAccept = async (requestId: string) => {
     setMutatingId(requestId);
     try {
       await acceptFriendRequest(requestId);
-      await loadFriends();
+      invalidateFriendCache();
+      await refreshFriends({ silent: true });
     } catch (acceptError) {
       console.log("Accept friend request error:", acceptError);
       setError("Không thể chấp nhận lời mời.");
@@ -84,7 +98,8 @@ export default function FriendScreen() {
     setMutatingId(requestId);
     try {
       await rejectFriendRequest(requestId);
-      await loadFriends();
+      invalidateFriendCache();
+      await refreshFriends({ silent: true });
     } catch (rejectError) {
       console.log("Reject friend request error:", rejectError);
       setError("Không thể từ chối lời mời.");
@@ -101,7 +116,8 @@ export default function FriendScreen() {
       setMutatingId(friendId);
       try {
         await unfriend(friendId);
-        await loadFriends();
+        invalidateFriendCache();
+        await refreshFriends({ silent: true });
       } catch (err) {
         console.log("Unfriend error:", err);
         const msg = err?.response?.data?.message ?? "Không thể hủy kết bạn.";

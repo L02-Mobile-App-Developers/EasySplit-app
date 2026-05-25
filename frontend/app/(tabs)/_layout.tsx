@@ -1,16 +1,23 @@
 import NavigationBar from "@/components/navigationBar";
-import { Stack } from "expo-router";
+import { Tabs } from "expo-router";
 import { View } from "react-native";
 
 export default function TabLayout() {
   return (
     <View style={{ flex: 1 }}>
-      {/* Nội dung màn hình */}
       <View style={{ flex: 1 }}>
-        <Stack screenOptions={{ headerShown: false }} />
+        <Tabs
+          screenOptions={{ headerShown: false }}
+          tabBar={() => null}
+        >
+          <Tabs.Screen name="index" options={{ title: "Trang chủ" }} />
+          <Tabs.Screen name="group" options={{ title: "Nhóm" }} />
+          <Tabs.Screen name="friend" options={{ title: "Bạn bè" }} />
+          <Tabs.Screen name="history" options={{ title: "Lịch sử" }} />
+          <Tabs.Screen name="profile" options={{ title: "Cá nhân" }} />
+        </Tabs>
       </View>
 
-      {/* Navbar custom */}
       <NavigationBar />
     </View>
   );

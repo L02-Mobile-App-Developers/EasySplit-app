@@ -14,12 +14,18 @@ interface GroupStore {
   >;
   setGroupCache: (groupId: string, data: any) => void;
   getGroupCache: (groupId: string) => any | null;
+  getGroupCacheEntry: (groupId: string) => { data: any; ts: number } | null;
   invalidateGroupCache: (groupId: string) => void;
+  groupListCache: { data: any[]; ts: number } | null;
+  setGroupListCache: (data: any[]) => void;
+  getGroupListCacheEntry: () => { data: any[]; ts: number } | null;
+  invalidateGroupListCache: () => void;
 }
 
-export const useGroupStore = create<GroupStore>((set) => ({
+export const useGroupStore = create<GroupStore>((set, get) => ({
   roles: {},
   groupCache: {},
+  groupListCache: null,
   setRoles(map) {
     set({ roles: { ...map } });
   },
@@ -30,16 +36,12 @@ export const useGroupStore = create<GroupStore>((set) => ({
     set((s) => ({ groupCache: { ...s.groupCache, [groupId]: { data, ts: Date.now() } } }));
   },
   getGroupCache(groupId) {
-    const state = (useGroupStore.getState && useGroupStore.getState()) as any;
-    const entry = state?.groupCache?.[groupId];
+    const entry = get().groupCache[groupId];
     if (!entry) return null;
     return entry.data;
   },
   getGroupCacheEntry(groupId) {
-    const state = (useGroupStore.getState && useGroupStore.getState()) as any;
-    const entry = state?.groupCache?.[groupId];
-    if (!entry) return null;
-    return entry;
+    return get().groupCache[groupId] ?? null;
   },
   invalidateGroupCache(groupId) {
     set((s) => {
@@ -47,6 +49,15 @@ export const useGroupStore = create<GroupStore>((set) => ({
       delete c[groupId];
       return { groupCache: c };
     });
+  },
+  setGroupListCache(data) {
+    set({ groupListCache: { data, ts: Date.now() } });
+  },
+  getGroupListCacheEntry() {
+    return get().groupListCache;
+  },
+  invalidateGroupListCache() {
+    set({ groupListCache: null });
   },
 }));
 

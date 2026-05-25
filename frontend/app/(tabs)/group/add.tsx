@@ -1,11 +1,13 @@
 import { AntDesign, MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import TopAppBar from "@/components/TopAppBar";
 import { groupService } from "@/api/services/group.service";
 import type { GroupCategory } from "@/api/types/group";
+import { useGroupStore } from "@/store/group.store";
+import { useHomeStore } from "@/store/home.store";
 
 const categories: Array<{ value: GroupCategory; label: string; hint: string }> = [
   { value: "trip", label: "Du lịch", hint: "Chuyến đi ngắn hoặc dài ngày" },
@@ -41,10 +43,17 @@ export default function AddGroupScreen() {
 
     try {
       await groupService.createGroup({ name: name.trim(), category, members: selectedMembers });
+      useGroupStore.getState().invalidateGroupListCache();
+      useHomeStore.getState().invalidate();
 
-      Alert.alert("Đã tạo nhóm", `Nhóm ${name} đã sẵn sàng.`, [
-        { text: "OK", onPress: () => router.replace("/group") },
-      ]);
+      if (Platform.OS === "web") {
+        window.alert(`Đã tạo nhóm thành công: ${name}`);
+        router.replace("/group");
+      } else {
+        Alert.alert("Đã tạo nhóm", `Nhóm ${name} đã sẵn sàng.`, [
+          { text: "OK", onPress: () => router.replace("/group") },
+        ]);
+      }
     } catch (error) {
       console.error("Create group failed", error);
       Alert.alert("Không thể tạo nhóm", "Thử lại sau nhé.");
@@ -68,7 +77,7 @@ export default function AddGroupScreen() {
 
   return (
     <View style={styles.screen}>
-      <TopAppBar title="Tạo nhóm" showBack />
+      <TopAppBar title="Tạo nhóm" showBack onBackPress={() => router.replace("/group")} />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.heroCard}>
           <View style={styles.badge}><Text style={styles.badgeText}>Material</Text></View>
