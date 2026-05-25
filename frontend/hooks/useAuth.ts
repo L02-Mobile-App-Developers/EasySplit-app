@@ -7,6 +7,8 @@ export const useAuth = () => {
 
   const register = useAuthStore((state) => state.register);
 
+  const loginWithGoogle = useAuthStore((state) => state.loginWithGoogle);
+
   const logout = useAuthStore((state) => state.logout);
 
   const fetchMe = useAuthStore((state) => state.fetchMe);
@@ -19,6 +21,7 @@ export const useAuth = () => {
     user,
     login,
     register,
+    loginWithGoogle,
     logout,
     fetchMe,
     isAuthenticated,

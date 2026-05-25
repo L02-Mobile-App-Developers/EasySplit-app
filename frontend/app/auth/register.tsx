@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -17,6 +17,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/ThemedText";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAuth } from "@/hooks/useAuth";
+import { useGoogleSignIn } from "@/hooks/useGoogleSignIn";
 
 import { authService } from "../../api/services/auth.service";
 
@@ -27,6 +29,8 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const { loginWithGoogle } = useAuth();
+  const googleSignIn = useGoogleSignIn();
   const brandGreen = selected;
   const placeholderGray = "#6B7280";
   const surface = "#FFFFFF";
@@ -40,6 +44,29 @@ export default function Register() {
     }
     router.replace("/auth/login");
   };
+
+  useEffect(() => {
+    if (!googleSignIn.idToken) return;
+
+    async function syncGoogleUser() {
+      try {
+        await loginWithGoogle(googleSignIn.idToken!);
+        setSubmitError(null);
+        Alert.alert("ThÃ nh cÃ´ng", "ÄÄƒng kÃ½ Google thÃ nh cÃ´ng");
+        router.replace("/(tabs)");
+      } catch (error: any) {
+        console.error("ÄÄƒng kÃ½ Google tháº¥t báº¡i:", error);
+        const message =
+          error?.response?.data?.error?.message ||
+          googleSignIn.error?.message ||
+          "ÄÄƒng kÃ½ Google tháº¥t báº¡i";
+        setSubmitError(message);
+        Alert.alert("Lá»—i", message);
+      }
+    }
+
+    syncGoogleUser();
+  }, [googleSignIn.idToken, googleSignIn.error, loginWithGoogle]);
 
   const handleRegister = async () => {
     setSubmitError(null);
@@ -195,6 +222,25 @@ export default function Register() {
             </TouchableOpacity>
 
             <TouchableOpacity
+              activeOpacity={0.85}
+              disabled={googleSignIn.disabled}
+              onPress={googleSignIn.signIn}
+              style={[
+                styles.googleButton,
+                { borderColor: outline, backgroundColor: surface },
+                googleSignIn.disabled && styles.disabledButton,
+              ]}
+            >
+              <Ionicons name="logo-google" size={20} color="#DB4437" />
+              <ThemedText
+                fontWeight="semibold"
+                style={[styles.googleButtonText, { color: textColor }]}
+              >
+                ÄÄƒng kÃ½ báº±ng Google
+              </ThemedText>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => router.replace("/auth/login")}
               style={styles.footerLinkWrap}
@@ -321,6 +367,20 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   buttonText: { color: "white" },
+  googleButton: {
+    marginTop: 12,
+    minHeight: 52,
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  googleButtonText: { fontSize: 14 },
+  disabledButton: {
+    opacity: 0.6,
+  },
   footerLinkWrap: {
     flexDirection: "row",
     justifyContent: "center",

@@ -22,6 +22,8 @@ interface AuthStore {
     password: string,
   ) => Promise<void>;
 
+  loginWithGoogle: (firebaseIdToken: string) => Promise<void>;
+
   fetchMe: () => Promise<void>;
 
   logout: () => Promise<void>;
@@ -70,6 +72,25 @@ export const useAuthStore = create<AuthStore>((set) => ({
         user: data.user,
         isAuthenticated: true,
       });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  async loginWithGoogle(firebaseIdToken) {
+    set({ loading: true });
+
+    try {
+      await tokenStorage.setTokens(firebaseIdToken, "");
+      const user = await authService.sync();
+
+      set({
+        user,
+        isAuthenticated: true,
+      });
+    } catch (error) {
+      await tokenStorage.clear();
+      throw error;
     } finally {
       set({ loading: false });
     }

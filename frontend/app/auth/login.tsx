@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -18,19 +18,42 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "@/components/ThemedText";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAuth } from "@/hooks/useAuth";
+import { useGoogleSignIn } from "@/hooks/useGoogleSignIn";
 
 export default function Login() {
   const { textColor, backgroundWhite, selected, lightGray } = useAppTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
+  const googleSignIn = useGoogleSignIn();
 
   const brandGreen = selected;
   const placeholderGray = "#6B7280";
   const surface = "#FFFFFF";
   const surfaceVariant = "#F7F9F7";
   const outline = lightGray;
+
+  useEffect(() => {
+    if (!googleSignIn.idToken) return;
+
+    async function syncGoogleUser() {
+      try {
+        await loginWithGoogle(googleSignIn.idToken!);
+        Alert.alert("ThÃ nh cÃ´ng", "ÄÄƒng nháº­p Google thÃ nh cÃ´ng");
+        router.replace("/(tabs)");
+      } catch (error: any) {
+        console.log(error?.response?.data || error);
+        const message =
+          error?.response?.data?.error?.message ||
+          googleSignIn.error?.message ||
+          "ÄÄƒng nháº­p Google tháº¥t báº¡i";
+        Alert.alert("Lá»—i", message);
+      }
+    }
+
+    syncGoogleUser();
+  }, [googleSignIn.idToken, googleSignIn.error, loginWithGoogle]);
 
   return (
     <SafeAreaView
@@ -146,23 +169,17 @@ export default function Login() {
             </View>
 
             <View style={styles.socialRow}>
-              {[
-                { name: "logo-google", color: "#DB4437" },
-                { name: "logo-facebook", color: "#1877F2" },
-                { name: "logo-twitter", color: "#1DA1F2" },
-              ].map((item) => (
-                <TouchableOpacity
-                  key={item.name}
-                  activeOpacity={0.85}
-                  style={styles.socialButton}
-                >
-                  <Ionicons
-                    name={item.name as keyof typeof Ionicons.glyphMap}
-                    size={22}
-                    color={item.color}
-                  />
-                </TouchableOpacity>
-              ))}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                disabled={googleSignIn.disabled}
+                onPress={googleSignIn.signIn}
+                style={[
+                  styles.socialButton,
+                  googleSignIn.disabled && styles.disabledButton,
+                ]}
+              >
+                <Ionicons name="logo-google" size={22} color="#DB4437" />
+              </TouchableOpacity>
             </View>
 
             <TouchableOpacity
@@ -296,6 +313,9 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 3 },
       },
     }),
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
   footerLinkWrap: {
     flexDirection: "row",
