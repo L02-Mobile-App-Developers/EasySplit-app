@@ -5,7 +5,6 @@ import type {
   AuthResponse,
   LoginRequest,
   RegisterRequest,
-  User,
 } from "../types/auth";
 
 import type { ApiSuccessResponse } from "../types/response";
@@ -54,7 +53,7 @@ export const authService = {
 
   // POST /auth/sync
   async sync() {
-    const response = await apiClient.post<ApiSuccessResponse<User>>(
+    const response = await apiClient.post<ApiSuccessResponse<AuthResponse>>(
       ENDPOINTS.AUTH.SYNC,
     );
     return response.data.data;
