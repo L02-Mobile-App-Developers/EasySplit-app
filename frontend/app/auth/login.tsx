@@ -104,7 +104,6 @@ export default function Login() {
 
                   setLoading(true);
                   await login(email, password);
-                  Alert.alert("Thành công", "Đăng nhập thành công");
                   router.replace("/(tabs)");
                 } catch (error: any) {
                   console.log(error?.response?.data || error);

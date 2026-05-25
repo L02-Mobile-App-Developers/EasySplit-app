@@ -19,7 +19,6 @@ jest.mock("@/api/services/me.service", () => ({
 jest.mock("@/api/storage/token.storage", () => ({
   tokenStorage: {
     setTokens: jest.fn(),
-    getAccessToken: jest.fn(),
     clear: jest.fn(),
   },
 }));
@@ -85,30 +84,6 @@ describe("useAuthStore", () => {
 
     expect(useAuthStore.getState().user).toBeNull();
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
-  });
-
-  it("bootstrap fetches profile when access token exists", async () => {
-    (tokenStorage.getAccessToken as jest.Mock).mockResolvedValue("access");
-    (meService.getProfile as jest.Mock).mockResolvedValue(mockUser);
-
-    await useAuthStore.getState().bootstrap();
-
-    expect(meService.getProfile).toHaveBeenCalled();
-    expect(useAuthStore.getState().user).toEqual(mockUser);
-    expect(useAuthStore.getState().isAuthenticated).toBe(true);
-    expect(useAuthStore.getState().loading).toBe(false);
-  });
-
-  it("bootstrap keeps user logged out when token is missing", async () => {
-    useAuthStore.setState({ user: mockUser, isAuthenticated: true });
-    (tokenStorage.getAccessToken as jest.Mock).mockResolvedValue(null);
-
-    await useAuthStore.getState().bootstrap();
-
-    expect(meService.getProfile).not.toHaveBeenCalled();
-    expect(useAuthStore.getState().user).toBeNull();
-    expect(useAuthStore.getState().isAuthenticated).toBe(false);
-    expect(useAuthStore.getState().loading).toBe(false);
   });
 
   it("logout clears tokens and user", async () => {

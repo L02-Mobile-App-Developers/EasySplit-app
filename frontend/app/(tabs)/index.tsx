@@ -88,12 +88,46 @@ export default function Index() {
           return;
         }
 
-        const balanceResults = await Promise.allSettled(
-          allGroups.map(async (group) => {
-            const myBalance = await balanceService.getMyBalance(group.id);
-            return normalizeMoney(myBalance.balance);
-          }),
-        );
+        const cachedHomeData = getHomeCacheEntry()?.data;
+        const initialData = {
+          groups: scopedGroups,
+          recentActivities: scopedGroups
+            .map((group) => group.latestActivity ? mapHomeActivity(group, group.latestActivity) : null)
+            .filter((activity): activity is HomeActivity & { sortKey: number } => Boolean(activity))
+            .sort((left, right) => right.sortKey - left.sortKey)
+            .slice(0, 3),
+          netBalance: cachedHomeData?.netBalance ?? 0,
+          owedBalance: cachedHomeData?.owedBalance ?? 0,
+          receivableBalance: cachedHomeData?.receivableBalance ?? 0,
+        };
+
+        applyHomeCache(initialData);
+        if (!silent) setLoading(false);
+
+        const [balanceResults, activityResults] = await Promise.all([
+          Promise.allSettled(
+            allGroups.map(async (group) => {
+              const myBalance = await balanceService.getMyBalance(group.id);
+              return normalizeMoney(myBalance.balance);
+            }),
+          ),
+          Promise.all(
+            scopedGroups.map(async (group) => {
+              try {
+                const activities = await activityService.getActivities(group.id, { page: 1, limit: 1 });
+                return {
+                  group,
+                  latestActivity: activities.items?.[0] ?? group.latestActivity ?? null,
+                };
+              } catch {
+                return {
+                  group,
+                  latestActivity: group.latestActivity ?? null,
+                };
+              }
+            }),
+          ),
+        ]);
         const balances = balanceResults.map((result) =>
           result.status === "fulfilled" ? result.value : 0,
         );
@@ -102,23 +136,6 @@ export default function Index() {
         const net = balances.reduce((sum, current) => sum + current, 0);
         const rec = balances.filter((value) => value > 0).reduce((sum, current) => sum + current, 0);
         const owed = Math.abs(balances.filter((value) => value < 0).reduce((sum, current) => sum + current, 0));
-
-        const activityResults = await Promise.all(
-          scopedGroups.map(async (group) => {
-            try {
-              const activities = await activityService.getActivities(group.id, { page: 1, limit: 1 });
-              return {
-                group,
-                latestActivity: activities.items?.[0] ?? group.latestActivity ?? null,
-              };
-            } catch {
-              return {
-                group,
-                latestActivity: group.latestActivity ?? null,
-              };
-            }
-          }),
-        );
 
         const activities: Array<HomeActivity & { sortKey: number }> = [];
         activityResults.forEach((result) => {
@@ -154,7 +171,7 @@ export default function Index() {
     getCacheEntry: getHomeCacheEntry,
     applyCache: applyHomeCache,
     refresh: refreshHome,
-    ttlMs: 0,
+    ttlMs: 60_000,
   });
 
   const money = useMemo(() => Math.abs(netBalance), [netBalance]);
