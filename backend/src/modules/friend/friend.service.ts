@@ -17,7 +17,7 @@ export async function sendFriendRequest(fromUserId: string, toEmail: string) {
   if (!to) throw new NotFoundError("User not found");
   if (to.id === fromUserId) throw new ValidationError("Cannot send friend request to yourself");
 
-  const existing = await getQuery(
+  const existing = await getQuery<any>(
     collectionRef(collectionNames.friendRequests)
       .where("fromUserId", "==", fromUserId)
       .where("toUserId", "==", to.id)
@@ -25,7 +25,7 @@ export async function sendFriendRequest(fromUserId: string, toEmail: string) {
   );
   if (existing.length > 0) {
     const ex = existing[0];
-    if (ex.status === "pending") {
+    if (ex.status !== "rejected" && ex.status !== "cancelled") {
       throw new ConflictError("Friend request already sent");
     }
     // If previous request exists but is not pending (e.g., rejected/cancelled), allow sending again

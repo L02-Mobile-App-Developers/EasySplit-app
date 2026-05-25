@@ -96,8 +96,14 @@ describe('friend.service', () => {
   test('listIncomingRequests - returns items', async () => {
     const items = [{ id: 'r1', fromUserId: 'a', toUserId: 'b', status: 'pending' }];
     mockGetQuery.mockResolvedValue(items);
+    mockPublicUserMap.mockResolvedValue(new Map([['a', { id: 'a', displayName: 'Name a', email: 'a@x' }]]));
     const res = await friendService.listIncomingRequests('b');
-    expect(res).toEqual(items);
+    expect(res).toEqual([
+      {
+        ...items[0],
+        fromUser: { id: 'a', displayName: 'Name a', email: 'a@x' },
+      },
+    ]);
   });
 
   test('rejectOrCancelFriendRequest - success by recipient', async () => {

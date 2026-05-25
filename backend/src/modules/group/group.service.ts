@@ -8,6 +8,7 @@ import { config } from "../../config";
 import { isUserPremium } from "../../lib/entitlement";
 import {
   AppUser,
+  AuditLog,
   Balance,
   cleanForFirestore,
   collectionNames,
@@ -32,6 +33,12 @@ interface UpdateGroupInput {
   name?: string;
   category?: string;
 }
+
+type GroupListItem = Group & {
+  role: string;
+  memberCount: number;
+  latestActivity: { description: string; time: string; actorDisplayName?: string } | null;
+};
 
 export async function createGroup(userId: string, input: CreateGroupInput) {
   if (!(await isUserPremium(userId))) {
@@ -129,12 +136,14 @@ export async function getGroups(userId: string) {
 
       // fetch latest activity (audit log) for this group
       const logs = (
-        await getQuery(
+        await getQuery<AuditLog>(
           collectionRef(collectionNames.auditLogs)
             .where("entityType", "==", "group")
             .where("entityId", "==", group.id),
         )
-      ).sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime());
+      )
+        .filter((log: any) => log.createdAt instanceof Date)
+        .sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime());
 
       let latestActivity: { description: string; time: string; actorDisplayName?: string } | null = null;
       if (logs.length > 0) {
@@ -157,7 +166,7 @@ export async function getGroups(userId: string) {
   );
 
   return groups
-    .filter((group): group is Group & { role: string } => group !== null)
+    .filter((group): group is GroupListItem => group !== null)
     .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 }
 
@@ -381,13 +390,17 @@ export async function deleteGroup(groupId: string, userId: string) {
   const members = await getQuery<GroupMember>(
     collectionRef(collectionNames.groupMembers).where("groupId", "==", groupId),
   );
-  members.forEach((m) => batch.delete(docRef(collectionNames.groupMembers, m.id)));
+  members.forEach((m) =>
+    batch.delete(docRef(collectionNames.groupMembers, groupMemberId(m.groupId, m.userId))),
+  );
 
   // delete balances
   const balances = await getQuery<Balance>(
     collectionRef(collectionNames.balances).where("groupId", "==", groupId),
   );
-  balances.forEach((b) => batch.delete(docRef(collectionNames.balances, b.id)));
+  balances.forEach((b) =>
+    batch.delete(docRef(collectionNames.balances, balanceId(b.groupId, b.userId))),
+  );
 
   // delete expenses
   const expenses = await getQuery<any>(
