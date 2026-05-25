@@ -30,4 +30,5 @@ export interface GroupMemberSuccess {
 export interface CreateGroupRequest {
   name: string;
   category: GroupCategory;
+  members?: string[];
 }

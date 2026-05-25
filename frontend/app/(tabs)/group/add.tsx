@@ -1,6 +1,6 @@
 import { AntDesign, MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import TopAppBar from "@/components/TopAppBar";
@@ -15,20 +15,21 @@ const categories: Array<{ value: GroupCategory; label: string; hint: string }> =
   { value: "other", label: "Khác", hint: "Nhóm dùng chung linh hoạt" },
 ];
 
-const memberSuggestions = ["Mai", "Nam", "Vy", "Khoa", "Linh", "Huy"];
+import { listFriends } from "@/api/services/friend.service";
 
 export default function AddGroupScreen() {
   const [name, setName] = useState("");
   const [category, setCategory] = useState<GroupCategory>("trip");
-  const [selectedMembers, setSelectedMembers] = useState<string[]>(["Mai", "Nam"]);
+  const [friends, setFriends] = useState<Array<{ id: string; displayName: string }>>([]);
+  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
 
   const selectedCategory = useMemo(() => categories.find((item) => item.value === category), [category]);
 
-  const toggleMember = (member: string) => {
+  const toggleMember = (memberId: string) => {
     setSelectedMembers((current) =>
-      current.includes(member)
-        ? current.filter((item) => item !== member)
-        : [...current, member],
+      current.includes(memberId)
+        ? current.filter((item) => item !== memberId)
+        : [...current, memberId],
     );
   };
 
@@ -39,13 +40,31 @@ export default function AddGroupScreen() {
     }
 
     try {
-      await groupService.createGroup({ name: name.trim(), category });
-      Alert.alert("Đã tạo nhóm", `Nhóm ${name} đã sẵn sàng.`, [{ text: "OK", onPress: () => router.back() }]);
+      await groupService.createGroup({ name: name.trim(), category, members: selectedMembers });
+
+      Alert.alert("Đã tạo nhóm", `Nhóm ${name} đã sẵn sàng.`, [
+        { text: "OK", onPress: () => router.replace("/group") },
+      ]);
     } catch (error) {
       console.error("Create group failed", error);
       Alert.alert("Không thể tạo nhóm", "Thử lại sau nhé.");
     }
   };
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const list = await listFriends();
+        if (mounted) setFriends(list.map((f: any) => ({ id: f.id ?? f.userId ?? f.user_id, displayName: f.displayName ?? f.name ?? f.display_name })));
+      } catch (err) {
+        console.warn("Failed to load friends", err);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <View style={styles.screen}>
@@ -99,22 +118,26 @@ export default function AddGroupScreen() {
 
         <View style={styles.sectionCard}>
           <View style={styles.rowBetween}>
-            <Text style={styles.label}>Gợi ý thành viên</Text>
+            <Text style={styles.label}>Chọn bạn bè</Text>
             <Text style={styles.counter}>{selectedMembers.length} người</Text>
           </View>
           <View style={styles.memberGrid}>
-            {memberSuggestions.map((member) => {
-              const active = selectedMembers.includes(member);
-              return (
-                <Pressable
-                  key={member}
-                  onPress={() => toggleMember(member)}
-                  style={[styles.memberChip, active ? styles.memberChipActive : styles.memberChipInactive]}
-                >
-                  <Text style={[styles.memberChipText, active ? styles.memberChipTextActive : styles.memberChipTextInactive]}>{member}</Text>
-                </Pressable>
-              );
-            })}
+            {friends.length === 0 ? (
+              <Text style={{ color: "#6B7280" }}>Bạn chưa có bạn bè hoặc đang tải...</Text>
+            ) : (
+              friends.map((friend) => {
+                const active = selectedMembers.includes(friend.id);
+                return (
+                  <Pressable
+                    key={friend.id}
+                    onPress={() => toggleMember(friend.id)}
+                    style={[styles.memberChip, active ? styles.memberChipActive : styles.memberChipInactive]}
+                  >
+                    <Text style={[styles.memberChipText, active ? styles.memberChipTextActive : styles.memberChipTextInactive]}>{friend.displayName}</Text>
+                  </Pressable>
+                );
+              })
+            )}
           </View>
         </View>
 

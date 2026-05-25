@@ -6,6 +6,7 @@ import {
 } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
+import { Platform, ActivityIndicator } from "react-native";
 import {
   Image,
   Pressable,
@@ -14,6 +15,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Alert,
 } from "react-native";
 
 import { balanceService } from "@/api/services/balance.service";
@@ -39,6 +41,7 @@ export default function GroupDetailScreen() {
   const [members, setMembers] = useState<GroupMember[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [myBalance, setMyBalance] = useState<Balance>();
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [memberToPay, setMemberToPay] = useState<DebtEdge[]>([]);
   const [debts, setDebts] = useState<DebtEdge[]>([]);
@@ -171,7 +174,7 @@ export default function GroupDetailScreen() {
         {/* ACTION */}
         <View style={styles.actionRow}>
           <Pressable
-            onPress={() => router.push(`/group/${id}/add-expense`)}
+            onPress={() => router.push(`/group/${id}/add-expense`) }
             style={styles.actionButtonPrimary}
           >
             <MaterialIcons name="add-card" size={18} color="#FFFFFF" />
@@ -180,7 +183,7 @@ export default function GroupDetailScreen() {
           </Pressable>
 
           <Pressable
-            onPress={() => router.push(`/group/${id}/pay`)}
+            onPress={() => router.push(`/group/${id}/pay`) }
             style={styles.actionButtonSecondary}
           >
             <MaterialCommunityIcons
@@ -190,6 +193,59 @@ export default function GroupDetailScreen() {
             />
 
             <Text style={styles.actionButtonSecondaryText}>Thanh toán</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={async () => {
+              if (isDeleting) return;
+
+              const confirmMsg = "Bạn có chắc muốn xóa nhóm này? Hành động không thể hoàn tác.";
+
+              const doDelete = async () => {
+                setIsDeleting(true);
+                try {
+                  await groupService.deleteGroup(id as string);
+                  if (Platform.OS === "web") {
+                    window.alert("Nhóm đã được xóa");
+                    router.replace("/group");
+                  } else {
+                    Alert.alert("Đã xóa", "Nhóm đã được xóa", [
+                      { text: "OK", onPress: () => router.replace("/group") },
+                    ]);
+                  }
+                } catch (err: any) {
+                  console.error("Delete group error", err);
+                  const msg = err?.response?.data?.message ?? "Không thể xóa nhóm, thử lại sau.";
+                  if (Platform.OS === "web") window.alert(msg);
+                  else Alert.alert("Lỗi", msg);
+                } finally {
+                  setIsDeleting(false);
+                }
+              };
+
+              if (Platform.OS === "web") {
+                if (window.confirm(confirmMsg)) await doDelete();
+              } else {
+                Alert.alert("Xóa nhóm", confirmMsg, [
+                  { text: "Hủy", style: "cancel" },
+                  { text: "Xóa", style: "destructive", onPress: doDelete },
+                ]);
+              }
+            }}
+            style={[
+              styles.actionButtonSecondary,
+              { borderColor: "#FECACA", backgroundColor: "#FFF1F2" },
+            ]}
+            disabled={group?.role !== "owner" || isDeleting}
+          >
+            {isDeleting ? (
+              <ActivityIndicator size="small" color="#B91C1C" />
+            ) : (
+              <>
+                <MaterialIcons name="delete" size={18} color="#B91C1C" />
+                <Text style={[styles.actionButtonSecondaryText, { color: "#B91C1C" }]}>Xóa nhóm</Text>
+              </>
+            )}
           </Pressable>
         </View>
 

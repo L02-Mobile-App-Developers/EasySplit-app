@@ -58,6 +58,12 @@ export const groupService = {
     return response.data.data;
   },
 
+  // DELETE /groups/:groupId
+  async deleteGroup(groupId: string) {
+    const response = await apiClient.delete<ApiSuccessResponse<null>>(ENDPOINTS.GROUPS.DETAIL(groupId));
+    return response.data.data;
+  },
+
   // GET /groups/:groupId/members
   async getGroupMembers(groupId: string) {
     const response = await apiClient.get<ApiSuccessResponse<GroupMember[]>>(

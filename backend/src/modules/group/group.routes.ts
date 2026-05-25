@@ -12,6 +12,7 @@ const createGroupSchema = z.object({
   category: z
     .enum(["trip", "food", "roommate", "project", "other"])
     .default("other"),
+  members: z.array(z.string().uuid()).optional(),
 });
 
 router.post(
@@ -169,6 +170,19 @@ router.delete(
         (req.params.userId as string),
       );
       sendSuccess(res, null, "Member removed");
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// DELETE /groups/:groupId -> remove group (owner only)
+router.delete(
+  "/:groupId",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await groupService.deleteGroup((req.params.groupId as string), req.user!.userId);
+      sendSuccess(res, null, "Group deleted");
     } catch (err) {
       next(err);
     }

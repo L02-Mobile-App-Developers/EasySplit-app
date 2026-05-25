@@ -25,6 +25,7 @@ import {
 interface CreateGroupInput {
   name: string;
   category: string;
+  members?: string[];
 }
 
 interface UpdateGroupInput {
@@ -79,6 +80,35 @@ export async function createGroup(userId: string, input: CreateGroupInput) {
     docRef(collectionNames.balances, balanceId(group.id, userId)),
     cleanForFirestore(balance),
   );
+  // add optional initial members
+  if (input.members && Array.isArray(input.members) && input.members.length > 0) {
+    const unique = Array.from(new Set(input.members));
+    for (const memberId of unique) {
+      if (memberId === userId) continue;
+      const userExists = await getDoc<AppUser>(collectionNames.users, memberId);
+      if (!userExists) continue;
+
+      const member: GroupMember = {
+        groupId: group.id,
+        userId: memberId,
+        role: "member",
+        joinedAt: now,
+        isActive: true,
+      };
+
+      batch.set(
+        docRef(collectionNames.groupMembers, groupMemberId(group.id, memberId)),
+        cleanForFirestore(member),
+      );
+
+      batch.set(
+        docRef(collectionNames.balances, balanceId(group.id, memberId)),
+        cleanForFirestore({ groupId: group.id, userId: memberId, balance: 0 }),
+        { merge: true },
+      );
+    }
+  }
+
   await batch.commit();
 
   return group;
@@ -309,6 +339,54 @@ export async function removeMember(
     collectionNames.groupMembers,
     groupMemberId(groupId, targetUserId),
   ).set(cleanForFirestore({ ...member, isActive: false }));
+}
+
+export async function deleteGroup(groupId: string, userId: string) {
+  await assertOwner(groupId, userId);
+
+  // delete group and related documents: members, balances, expenses, settlements, reminders, audit logs
+  const batch = collectionRef(collectionNames.groups).firestore.batch();
+
+  // delete group doc
+  batch.delete(docRef(collectionNames.groups, groupId));
+
+  // delete group members
+  const members = await getQuery<GroupMember>(
+    collectionRef(collectionNames.groupMembers).where("groupId", "==", groupId),
+  );
+  members.forEach((m) => batch.delete(docRef(collectionNames.groupMembers, m.id)));
+
+  // delete balances
+  const balances = await getQuery<Balance>(
+    collectionRef(collectionNames.balances).where("groupId", "==", groupId),
+  );
+  balances.forEach((b) => batch.delete(docRef(collectionNames.balances, b.id)));
+
+  // delete expenses
+  const expenses = await getQuery<any>(
+    collectionRef(collectionNames.expenses).where("groupId", "==", groupId),
+  );
+  expenses.forEach((e) => batch.delete(docRef(collectionNames.expenses, e.id)));
+
+  // delete settlements
+  const settlements = await getQuery<any>(
+    collectionRef(collectionNames.settlements).where("groupId", "==", groupId),
+  );
+  settlements.forEach((s) => batch.delete(docRef(collectionNames.settlements, s.id)));
+
+  // delete reminders
+  const reminders = await getQuery<any>(
+    collectionRef(collectionNames.reminders).where("groupId", "==", groupId),
+  );
+  reminders.forEach((r) => batch.delete(docRef(collectionNames.reminders, r.id)));
+
+  // delete audit logs for this group
+  const logs = await getQuery<any>(
+    collectionRef(collectionNames.auditLogs).where("entityType", "==", "group").where("entityId", "==", groupId),
+  );
+  logs.forEach((l) => batch.delete(docRef(collectionNames.auditLogs, l.id)));
+
+  await batch.commit();
 }
 
 async function getMembership(groupId: string, userId: string) {
