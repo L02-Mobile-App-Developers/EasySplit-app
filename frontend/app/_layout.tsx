@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Platform, Text, TextInput } from "react-native";
 
 import LoadingScreen from "@/services/LoadingScreen";
+import { useAuthStore } from "@/store/auth.store";
 
 import {
   Inter_400Regular,
@@ -34,6 +35,7 @@ TextInput.defaultProps.style = [
 
 export default function RootLayout() {
   const [appReady, setAppReady] = useState(false);
+  const bootstrapAuth = useAuthStore((state) => state.bootstrap);
 
   const [loaded, error] = useFonts({
     Inter_400Regular,
@@ -49,13 +51,7 @@ export default function RootLayout() {
       if (!loaded && !error) return;
 
       try {
-        // load api
-        // load token
-        // load async storage
-        // fetch user
-        // ...
-
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await bootstrapAuth();
       } catch (e) {
         console.log(e);
       } finally {
@@ -65,7 +61,7 @@ export default function RootLayout() {
     }
 
     prepare();
-  }, [loaded, error]);
+  }, [loaded, error, bootstrapAuth]);
 
   useEffect(() => {
     if (Platform.OS === "android") {

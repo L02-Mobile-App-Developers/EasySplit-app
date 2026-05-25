@@ -24,6 +24,8 @@ interface AuthStore {
 
   fetchMe: () => Promise<void>;
 
+  bootstrap: () => Promise<void>;
+
   logout: () => Promise<void>;
 }
 
@@ -88,6 +90,22 @@ export const useAuthStore = create<AuthStore>((set) => ({
         user: null,
         isAuthenticated: false,
       });
+    }
+  },
+
+  async bootstrap() {
+    set({ loading: true });
+
+    try {
+      const token = await tokenStorage.getAccessToken();
+      if (!token) {
+        set({ user: null, isAuthenticated: false });
+        return;
+      }
+
+      await useAuthStore.getState().fetchMe();
+    } finally {
+      set({ loading: false });
     }
   },
 

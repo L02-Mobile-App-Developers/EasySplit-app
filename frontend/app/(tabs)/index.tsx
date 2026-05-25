@@ -279,9 +279,9 @@ export default function Index() {
                   <ThemedText style={styles.activityTime}>{item.time}</ThemedText>
                 </View>
                 <View style={styles.activityRight}>
-                  <ThemedText style={styles.activityMoney}>${item.money}</ThemedText>
+                  <ThemedText style={styles.activityMoney}>{item.money.toLocaleString()} VND</ThemedText>
                   <ThemedText style={styles.activityType}>
-                    {item.type === "received" ? "Lấy lại" : "Cần trả"}
+                    {item.type === "received" ? "Được nhận" : "Đã trả"}
                   </ThemedText>
                 </View>
               </View>
@@ -295,7 +295,7 @@ export default function Index() {
 }
 
 function mapHomeActivity(group: HomeGroup, activity: any): HomeActivity & { sortKey: number } {
-  const description = activity.description ?? activity.title ?? activity.action ?? `${group.name} có hoạt động mới`;
+  const description = localizeHomeActivity(group, activity);
   const createdAt = activity.createdAt ?? activity.time ?? new Date().toISOString();
   const money = typeof activity.amount === "number" ? activity.amount : typeof activity.money === "number" ? activity.money : 0;
   const type: HomeActivity["type"] = money >= 0 ? "received" : "paid";
@@ -309,6 +309,69 @@ function mapHomeActivity(group: HomeGroup, activity: any): HomeActivity & { sort
     type,
     sortKey: new Date(createdAt).getTime(),
   };
+}
+
+function localizeHomeActivity(group: HomeGroup, activity: any) {
+  const actor = activity.actorDisplayName ?? activity.actor?.displayName ?? "Một thành viên";
+  const action = String(activity.action ?? activity.description ?? activity.title ?? "").trim();
+  const normalizedAction = action.toLowerCase().replace(/[:.]/g, "_");
+
+  switch (normalizedAction) {
+    case "group_created":
+    case "group_create":
+      return `${actor} đã tạo nhóm ${group.name}`;
+    case "group_closed":
+    case "group_close":
+      return `${actor} đã quyết toán nhóm ${group.name}`;
+    case "expense_created":
+    case "expense_create":
+      return `${actor} đã thêm khoản chi trong ${group.name}`;
+    case "expense_updated":
+    case "expense_update":
+      return `${actor} đã cập nhật khoản chi trong ${group.name}`;
+    case "expense_deleted":
+    case "expense_delete":
+      return `${actor} đã xóa khoản chi trong ${group.name}`;
+    case "settlement_created":
+    case "settlement_create":
+      return `${actor} đã tạo thanh toán trong ${group.name}`;
+    case "settlement_updated":
+    case "settlement_update":
+      return `${actor} đã cập nhật thanh toán trong ${group.name}`;
+    case "member_added":
+    case "member_join":
+    case "member_created":
+      return `${actor} đã tham gia nhóm ${group.name}`;
+    case "member_removed":
+    case "member_delete":
+      return `${actor} đã rời nhóm ${group.name}`;
+    case "reminder_created":
+    case "reminder_create":
+      return `${actor} đã tạo nhắc nhở trong ${group.name}`;
+    case "smart_settle":
+    case "smart_settlement":
+    case "group_settlement_committed":
+      return `${actor} đã thực hiện thanh toán thông minh trong ${group.name}`;
+    default:
+      return translateRawActivityText(action, group.name);
+  }
+}
+
+function translateRawActivityText(text: string, groupName: string) {
+  if (!text) return `${groupName} có hoạt động mới`;
+
+  const normalized = text.toLowerCase();
+  if (/[à-ỹđ]/i.test(text)) return text;
+  if (normalized.includes("expense")) return `Có cập nhật khoản chi trong ${groupName}`;
+  if (normalized.includes("settlement") || normalized.includes("paid") || normalized.includes("payment")) {
+    return `Có cập nhật thanh toán trong ${groupName}`;
+  }
+  if (normalized.includes("member") || normalized.includes("joined") || normalized.includes("left")) {
+    return `Có cập nhật thành viên trong ${groupName}`;
+  }
+  if (normalized.includes("group")) return `Có cập nhật nhóm ${groupName}`;
+
+  return `${groupName} có hoạt động mới`;
 }
 
 function normalizeMoney(value: unknown) {
