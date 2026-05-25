@@ -1,4 +1,3 @@
-import { v4 as uuidv4 } from "uuid";
 
 import { apiClient } from "../client";
 import { ENDPOINTS } from "../endpoints";
@@ -14,6 +13,10 @@ import type {
   ApiSuccessResponse,
 } from "../types/response";
 
+const generateIdempotencyKey = () => {
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+};
+
 export const expenseService = {
   // POST /groups/:groupId/expenses
   async createExpense(groupId: string, payload: CreateExpenseRequest) {
@@ -22,7 +25,7 @@ export const expenseService = {
       payload,
       {
         headers: {
-          "Idempotency-Key": uuidv4(),
+          "Idempotency-Key": generateIdempotencyKey(),
         },
       },
     );

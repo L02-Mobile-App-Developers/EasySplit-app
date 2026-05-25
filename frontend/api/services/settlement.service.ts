@@ -14,6 +14,10 @@ import type {
   ApiSuccessResponse,
 } from "../types/response";
 
+const generateIdempotencyKey = () => {
+  return `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+};
+
 export const settlementService = {
   // GET /groups/:groupId/debts
   async getDebts(groupId: string) {
@@ -49,7 +53,7 @@ export const settlementService = {
       payload,
       {
         headers: {
-          "Idempotency-Key": crypto.randomUUID(),
+          "Idempotency-Key": generateIdempotencyKey(),
         },
       },
     );
