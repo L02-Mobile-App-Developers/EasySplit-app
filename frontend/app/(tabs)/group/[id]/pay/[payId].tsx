@@ -95,7 +95,8 @@ export default function PayDetailScreen() {
       Alert.alert("Thành công", "Thanh toán thành công", [
         {
           text: "OK",
-          onPress: () => router.back(),
+          onPress: () =>
+            router.replace(`/group/${String(id)}?refresh=${Date.now()}` as any),
         },
       ]);
     } catch (err) {
