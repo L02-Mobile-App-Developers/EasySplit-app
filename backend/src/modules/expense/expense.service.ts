@@ -23,6 +23,7 @@ import {
   GroupMember,
   paginate,
   publicUserMap,
+  Settlement,
   sortByDateDesc,
 } from "../../lib/firestore-db";
 
@@ -245,6 +246,7 @@ function recalculateBalances(
   transaction: Transaction,
   groupId: string,
   expenses: Expense[],
+  settlements: Settlement[],
   activeMembers: GroupMember[],
   existingBalances: Balance[],
 ) {
@@ -268,6 +270,17 @@ function recalculateBalances(
     for (const [userId, share] of shares) {
       netMap.set(userId, (netMap.get(userId) ?? 0) - share);
     }
+  }
+
+  for (const settlement of settlements) {
+    netMap.set(
+      settlement.fromUserId,
+      (netMap.get(settlement.fromUserId) ?? 0) + settlement.amount,
+    );
+    netMap.set(
+      settlement.toUserId,
+      (netMap.get(settlement.toUserId) ?? 0) - settlement.amount,
+    );
   }
 
   const activeMemberIds = new Set(activeMembers.map((member) => member.userId));
@@ -304,7 +317,7 @@ function sharesToParticipants(
 }
 
 async function readGroupState(transaction: Transaction, groupId: string) {
-  const [activeMembers, expenses, balances] = await Promise.all([
+  const [activeMembers, expenses, balances, settlements] = await Promise.all([
     getQueryInTransaction<GroupMember>(
       transaction,
       collectionRef(collectionNames.groupMembers)
@@ -319,9 +332,13 @@ async function readGroupState(transaction: Transaction, groupId: string) {
       transaction,
       collectionRef(collectionNames.balances).where("groupId", "==", groupId),
     ),
+    getQueryInTransaction<Settlement>(
+      transaction,
+      collectionRef(collectionNames.settlements).where("groupId", "==", groupId),
+    ),
   ]);
 
-  return { activeMembers, expenses, balances };
+  return { activeMembers, expenses, balances, settlements };
 }
 
 async function getExpenseForResponse(expense: Expense | string) {
@@ -364,7 +381,7 @@ export async function createExpense(
   const created = await collectionRef(collectionNames.expenses).firestore.runTransaction(
     async (transaction) => {
       await assertGroupMemberInTransaction(transaction, groupId, userId);
-      const { activeMembers, expenses, balances } = await readGroupState(
+      const { activeMembers, expenses, balances, settlements } = await readGroupState(
         transaction,
         groupId,
       );
@@ -397,6 +414,7 @@ export async function createExpense(
         transaction,
         groupId,
         [...expenses, expense],
+        settlements,
         activeMembers,
         balances,
       );
@@ -477,7 +495,7 @@ export async function updateExpense(
         throw new NotFoundError("Expense not found");
       }
 
-      const { activeMembers, expenses, balances } = await readGroupState(
+      const { activeMembers, expenses, balances, settlements } = await readGroupState(
         transaction,
         groupId,
       );
@@ -536,6 +554,7 @@ export async function updateExpense(
         expenses.map((expense) =>
           expense.id === expenseId ? updatedExpense : expense,
         ),
+        settlements,
         activeMembers,
         balances,
       );
@@ -579,7 +598,7 @@ export async function deleteExpense(
         throw new NotFoundError("Expense not found");
       }
 
-      const { activeMembers, expenses, balances } = await readGroupState(
+      const { activeMembers, expenses, balances, settlements } = await readGroupState(
         transaction,
         groupId,
       );
@@ -597,6 +616,7 @@ export async function deleteExpense(
         transaction,
         groupId,
         expenses.filter((expense) => expense.id !== expenseId),
+        settlements,
         activeMembers,
         balances,
       );

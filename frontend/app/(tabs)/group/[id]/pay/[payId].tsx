@@ -7,6 +7,8 @@ import TopAppBar from "@/components/TopAppBar";
 import { GroupMember } from "@/api/types/group";
 
 import { useAuthStore } from "@/store/auth.store";
+import { useGroupStore } from "@/store/group.store";
+import { useHomeStore } from "@/store/home.store";
 
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
@@ -85,6 +87,10 @@ export default function PayDetailScreen() {
         amount: parsedAmount,
         note: note.trim() || undefined,
       });
+
+      useGroupStore.getState().invalidateGroupCache(String(id));
+      useGroupStore.getState().invalidateGroupListCache();
+      useHomeStore.getState().invalidate();
 
       Alert.alert("Thành công", "Thanh toán thành công", [
         {

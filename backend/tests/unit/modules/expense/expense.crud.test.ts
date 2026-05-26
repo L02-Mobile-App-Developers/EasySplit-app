@@ -8,7 +8,13 @@ const mockPublicUserMap: any = jest.fn();
 const mockCreateId: any = jest.fn(() => 'exp-99');
 
 jest.mock('@/lib/firestore-db', () => ({
-  collectionNames: { expenses: 'expenses', groupMembers: 'group_members', balances: 'balances', auditLogs: 'audit_logs' },
+  collectionNames: {
+    expenses: 'expenses',
+    groupMembers: 'group_members',
+    balances: 'balances',
+    settlements: 'settlements',
+    auditLogs: 'audit_logs',
+  },
   collectionRef: () => ({
     where: () => ({
       get: jest.fn().mockResolvedValue([]),
@@ -67,8 +73,9 @@ describe('expense.crud', () => {
     // membership and existing expense
     mockGetDocInTransaction.mockResolvedValueOnce({ userId: 'u1', role: 'member', isActive: true });
     mockGetDocInTransaction.mockResolvedValueOnce({ id: 'e1', groupId: 'g1', createdBy: 'u1', participants: [{ userId: 'u1', value: 0 }], paidByUserId: 'u1', amount: 10, splitMode: 'equal', currency: 'VND', createdAt: new Date(), updatedAt: new Date() });
-    // readGroupState -> activeMembers, expenses, balances
+    // readGroupState -> activeMembers, expenses, balances, settlements
     mockGetQueryInTransaction.mockResolvedValueOnce([{ userId: 'u1' }]);
+    mockGetQueryInTransaction.mockResolvedValueOnce([]);
     mockGetQueryInTransaction.mockResolvedValueOnce([]);
     mockGetQueryInTransaction.mockResolvedValueOnce([]);
 
@@ -83,6 +90,7 @@ describe('expense.crud', () => {
     mockGetDocInTransaction.mockResolvedValueOnce({ id: 'e1', groupId: 'g1', createdBy: 'other', participants: [], paidByUserId: 'u1', amount: 10, splitMode: 'equal', currency: 'VND', createdAt: new Date(), updatedAt: new Date() });
     // readGroupState
     mockGetQueryInTransaction.mockResolvedValueOnce([{ userId: 'u1' }]);
+    mockGetQueryInTransaction.mockResolvedValueOnce([]);
     mockGetQueryInTransaction.mockResolvedValueOnce([]);
     mockGetQueryInTransaction.mockResolvedValueOnce([]);
 

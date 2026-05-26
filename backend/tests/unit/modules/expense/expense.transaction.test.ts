@@ -6,15 +6,26 @@ const mockGetQuery: any = jest.fn();
 const mockGetDoc: any = jest.fn();
 const mockPublicUserMap: any = jest.fn();
 const mockCreateId: any = jest.fn(() => 'exp-1');
+const mockTransactionSet: any = jest.fn();
+const mockTransactionDelete: any = jest.fn();
 
 jest.mock('@/lib/firestore-db', () => ({
-  collectionNames: { expenses: 'expenses', groupMembers: 'group_members', balances: 'balances', auditLogs: 'audit_logs' },
+  collectionNames: {
+    expenses: 'expenses',
+    groupMembers: 'group_members',
+    balances: 'balances',
+    settlements: 'settlements',
+    auditLogs: 'audit_logs',
+  },
   collectionRef: () => ({
     where: () => ({
       get: jest.fn().mockResolvedValue([]),
       where: () => ({ get: jest.fn().mockResolvedValue([]) }),
     }),
-    firestore: { runTransaction: async (fn: any) => fn({ set: jest.fn(), delete: jest.fn(), update: jest.fn() }) },
+    firestore: {
+      runTransaction: async (fn: any) =>
+        fn({ set: mockTransactionSet, delete: mockTransactionDelete, update: jest.fn() }),
+    },
   }),
   getQueryInTransaction: (...a: any[]) => mockGetQueryInTransaction(...a),
   getDocInTransaction: (...a: any[]) => mockGetDocInTransaction(...a),
@@ -31,7 +42,11 @@ jest.mock('@/lib/firestore-db', () => ({
 import * as expenseService from '@/modules/expense/expense.service';
 
 describe('expense.transaction', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateId.mockImplementation(() => 'exp-1');
+    mockPublicUserMap.mockResolvedValue(new Map());
+  });
 
   test('createExpense - happy path', async () => {
     // membership assertion and transactional reads
@@ -39,6 +54,7 @@ describe('expense.transaction', () => {
     mockGetQueryInTransaction.mockResolvedValueOnce([{ userId: 'p1' }]); // activeMembers
     mockGetQueryInTransaction.mockResolvedValueOnce([]); // expenses
     mockGetQueryInTransaction.mockResolvedValueOnce([]); // balances
+    mockGetQueryInTransaction.mockResolvedValueOnce([]); // settlements
 
     // after transaction, getExpenseForResponse will call publicUserMap
     mockPublicUserMap.mockResolvedValue(new Map([
@@ -56,6 +72,54 @@ describe('expense.transaction', () => {
     const res = await expenseService.createExpense('g1', 'u1', input as any);
     expect(res).toHaveProperty('participants');
     expect(mockCreateId).toHaveBeenCalled();
+  });
+
+  test('createExpense - recalculates balances with prior settlements', async () => {
+    mockGetDocInTransaction.mockResolvedValueOnce({ userId: 'u1', isActive: true, role: 'member' });
+    mockGetQueryInTransaction.mockResolvedValueOnce([{ userId: 'u1' }, { userId: 'u2' }]); // activeMembers
+    mockGetQueryInTransaction.mockResolvedValueOnce([
+      {
+        id: 'old-expense',
+        groupId: 'g1',
+        amount: 100,
+        paidByUserId: 'u1',
+        splitMode: 'equal',
+        participants: [
+          { userId: 'u1', value: 50 },
+          { userId: 'u2', value: 50 },
+        ],
+      },
+    ]);
+    mockGetQueryInTransaction.mockResolvedValueOnce([]); // balances
+    mockGetQueryInTransaction.mockResolvedValueOnce([
+      {
+        id: 'settlement-1',
+        groupId: 'g1',
+        fromUserId: 'u2',
+        toUserId: 'u1',
+        amount: 50,
+      },
+    ]);
+
+    await expenseService.createExpense('g1', 'u1', {
+      description: 'new expense',
+      amount: 100,
+      paidByUserId: 'u1',
+      splitMode: 'equal',
+      participants: [
+        { userId: 'u1', value: 50 },
+        { userId: 'u2', value: 50 },
+      ],
+    } as any);
+
+    expect(mockTransactionSet).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ groupId: 'g1', userId: 'u1', balance: 50 }),
+    );
+    expect(mockTransactionSet).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ groupId: 'g1', userId: 'u2', balance: -50 }),
+    );
   });
 
   test('updateExpense - not found', async () => {
