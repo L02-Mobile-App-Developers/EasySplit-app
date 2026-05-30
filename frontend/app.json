@@ -16,8 +16,9 @@
     },
 
     "android": {
-      "package": "com.huytuangiang.frontend",
+      "package": "com.easysplit",
       "versionCode": 2,
+      "googleServicesFile": "./google-services.json",
 
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -52,6 +53,7 @@
       "expo-font",
       "expo-asset",
       "expo-secure-store",
+      "@react-native-firebase/app",
       "@react-native-community/datetimepicker"
     ],
 
