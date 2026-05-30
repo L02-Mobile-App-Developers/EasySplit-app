@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
   input: { flex: 1, color: "#0F172A", fontSize: 15 },
   categoryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   categoryCard: { width: "48%", borderRadius: 22, padding: 14, gap: 8, borderWidth: 1 },
-  categoryCardActive: { backgroundColor: "#0F5E28", borderColor: "#0F5E28" },
+  categoryCardActive: { backgroundColor: "#d4f6de", borderColor: "#a0d8b2" },
   categoryCardInactive: { backgroundColor: "#F7F9F7", borderColor: "#E5E7EB" },
   categoryIcon: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
   categoryIconActive: { backgroundColor: "rgba(255,255,255,0.18)" },
