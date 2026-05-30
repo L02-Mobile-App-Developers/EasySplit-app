@@ -1,5 +1,3 @@
-// app/group/[id]/pay/[payId].tsx
-
 import { groupService } from "@/api/services/group.service";
 import { settlementService } from "@/api/services/settlement.service";
 import TopAppBar from "@/components/TopAppBar";
@@ -62,6 +60,12 @@ export default function PayDetailScreen() {
       fetch();
     }
   }, [id, payId]);
+
+  useEffect(() => {
+    if (defaultAmount !== undefined && defaultAmount !== null) {
+      setAmount(String(defaultAmount));
+    }
+  }, [defaultAmount]);
 
   const parsedAmount = useMemo(() => {
     return Number(String(amount).replace(/[^0-9]/g, "")) || 0;

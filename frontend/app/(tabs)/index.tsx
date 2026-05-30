@@ -267,11 +267,15 @@ export default function Index() {
                 <View style={styles.groupIconWrap}>
                   <MaterialIcons name="tour" size={24} color="#1E8E3E" />
                 </View>
-                <ThemedText numberOfLines={1} ellipsizeMode="tail" fontWeight="bold" style={styles.groupName}>
-                  {item.name}
+                <View style={styles.groupInfo}>
+                  <ThemedText numberOfLines={1} ellipsizeMode="tail" fontWeight="bold" style={styles.groupName}>
+                    {item.name}
+                  </ThemedText>
+                  <ThemedText style={styles.groupMembers}>{item.memberCount} thành viên</ThemedText>
+                </View>
+                <ThemedText style={styles.groupStatus}>
+                  {item.status === "closed" ? "Đã quyết toán" : "Đang hoạt động"}
                 </ThemedText>
-                <ThemedText style={styles.groupMembers}>{item.memberCount} thành viên</ThemedText>
-                <ThemedText style={styles.groupStatus}>{item.status === "closed" ? "Đã quyết toán" : "Đang hoạt động"}</ThemedText>
               </View>
             ))}
           </View>
@@ -508,27 +512,33 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   cardGrid: {
-    flexDirection: "row",
+    flexDirection: "column",
     gap: 12,
   },
   groupCard: {
-    flex: 1,
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
     padding: 18,
-    gap: 6,
+    gap: 8,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.06,
     shadowRadius: 14,
     elevation: 3,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-start",
   },
   groupIconWrap: {
     backgroundColor: "rgba(34, 197, 94, 0.12)",
     padding: 12,
     borderRadius: 16,
-    marginBottom: 8,
     alignSelf: "flex-start",
+  },
+  groupInfo: {
+    flex: 1,
+    flexDirection: "column",
+    gap: 2,
   },
   groupName: {
     fontSize: 16,
@@ -537,7 +547,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   groupStatus: {
-    marginTop: 12,
+    alignSelf: "center",
     color: "#5F6368",
   },
   emptyCard: {

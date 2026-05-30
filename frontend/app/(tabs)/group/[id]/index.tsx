@@ -36,6 +36,7 @@ import { useGroupStore } from "@/store/group.store";
 import { useHomeStore } from "@/store/home.store";
 
 const currency = (value: number) => `${value.toLocaleString("vi-VN")}đ`;
+const darkGreen = "#0F5E28";
 
 export default function GroupDetailScreen() {
   const { id, refresh } = useLocalSearchParams<{ id: string; refresh?: string }>();
@@ -490,7 +491,9 @@ export default function GroupDetailScreen() {
                     </View>
                   </View>
 
-                  <TouchableOpacity style={styles.payButton}>
+                  <TouchableOpacity style={styles.payButton} onPress={
+                    () => router.push(`/group/${id}/pay/${user.toUserId}?amount=${user.amount}`)
+                  }>
                     <Text style={styles.payButtonText}>Trả nợ</Text>
                   </TouchableOpacity>
                 </View>
@@ -598,6 +601,13 @@ export default function GroupDetailScreen() {
           </View>
         </View>
       </ScrollView>
+      <TouchableOpacity
+        style={[styles.fab, { backgroundColor: darkGreen }]}
+        onPress={() => router.push(`/group/${id}/add-member`)}
+        activeOpacity={0.85}
+      >
+        <AntDesign name="plus" size={20} color="white" />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -795,6 +805,23 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     flexShrink: 1,
     textAlign: "center",
+  },
+
+  fab: {
+    position: "absolute",
+    right: 20,
+    bottom: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 6,
   },
 
   sectionCard: {
