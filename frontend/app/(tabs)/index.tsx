@@ -8,6 +8,7 @@ import { activityService } from "@/api/services/activity.service";
 import { balanceService } from "@/api/services/balance.service";
 import { groupService } from "@/api/services/group.service";
 import { useHomeStore } from "@/store/home.store";
+import { useAuthStore } from "@/store/auth.store";
 import type { Group } from "@/api/types/group";
 import TopAppBar from "@/components/TopAppBar";
 import { ThemedText } from "@/components/ThemedText";
@@ -59,6 +60,7 @@ export default function Index() {
   const [error, setError] = useState<string | null>(null);
   const getHomeCacheEntry = useHomeStore((s) => s.getCacheEntry);
   const setHomeCache = useHomeStore((s) => s.setCache);
+  const currentUser = useAuthStore((s) => s.user);
 
   const applyHomeCache = useCallback((data: HomeData, options: { clearError?: boolean } = {}) => {
     setGroups(data.groups ?? []);
@@ -92,7 +94,7 @@ export default function Index() {
         const initialData = {
           groups: scopedGroups,
           recentActivities: scopedGroups
-            .map((group) => group.latestActivity ? mapHomeActivity(group, group.latestActivity) : null)
+            .map((group) => group.latestActivity ? mapHomeActivity(group, group.latestActivity, currentUser?.id) : null)
             .filter((activity): activity is HomeActivity & { sortKey: number } => Boolean(activity))
             .sort((left, right) => right.sortKey - left.sortKey)
             .slice(0, 3),
@@ -112,7 +114,7 @@ export default function Index() {
             }),
           ),
           Promise.all(
-            scopedGroups.map(async (group) => {
+            allGroups.map(async (group) => {
               try {
                 const activities = await activityService.getActivities(group.id, { page: 1, limit: 1 });
                 return {
@@ -140,7 +142,7 @@ export default function Index() {
         const activities: Array<HomeActivity & { sortKey: number }> = [];
         activityResults.forEach((result) => {
           if (result.latestActivity) {
-            activities.push(mapHomeActivity(result.group, result.latestActivity));
+            activities.push(mapHomeActivity(result.group, result.latestActivity, currentUser?.id));
           }
         });
 
@@ -189,7 +191,6 @@ export default function Index() {
         showBack={false}
         showSearch
         showSettings
-        onSearchPress={handleSearch}
         onSettingsPress={handleSettings}
       />
 
@@ -222,13 +223,17 @@ export default function Index() {
         </View>
 
         <View style={styles.dualRow}>
-          <View style={[styles.dualCard, { backgroundColor: "#FDECEC" }]}>
-            <ThemedText fontWeight="bold" style={[styles.dualLabel, { color: errorRed }]}>Bạn đang nợ</ThemedText>
-            <ThemedText fontWeight="bold" style={[styles.dualValue, { color: errorRed }]}>{owedBalance.toLocaleString()} VND</ThemedText>
+          <View style={[styles.dualCard, { backgroundColor: "#FFF1F0" }]}>
+            <ThemedText fontWeight="bold" style={[styles.dualLabel, styles.dualLabelDark]}>Bạn đang nợ</ThemedText>
+            <ThemedText fontWeight="bold" style={[styles.dualValue, styles.dualAmountDebt]}>
+              {owedBalance.toLocaleString()} <ThemedText style={styles.dualAmountDebt}>VND</ThemedText>
+            </ThemedText>
           </View>
-          <View style={[styles.dualCard, { backgroundColor: "#E8F7EE" }]}>
-            <ThemedText fontWeight="bold" style={[styles.dualLabel, { color: successGreen }]}>Bạn được nhận</ThemedText>
-            <ThemedText fontWeight="bold" style={[styles.dualValue, { color: successGreen }]}>{receivableBalance.toLocaleString()} VND</ThemedText>
+          <View style={[styles.dualCard, { backgroundColor: "#ECFDF3" }]}>
+            <ThemedText fontWeight="bold" style={[styles.dualLabel, styles.dualLabelDark]}>Bạn được nhận</ThemedText>
+            <ThemedText fontWeight="bold" style={[styles.dualValue, styles.dualAmountReceive]}>
+              {receivableBalance.toLocaleString()} <ThemedText style={styles.dualAmountReceive}>VND</ThemedText>
+            </ThemedText>
           </View>
         </View>
 
@@ -252,7 +257,9 @@ export default function Index() {
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <ThemedText style={styles.sectionTitle}>Nhóm gần đây</ThemedText>
-            <ThemedText style={{ color: selected }}>Xem tất cả</ThemedText>
+            <TouchableOpacity onPress={() => router.push('/group') as any}>
+              <ThemedText style={{ color: selected }}>Xem tất cả</ThemedText>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.cardGrid}>
@@ -263,7 +270,12 @@ export default function Index() {
             ) : null}
 
             {groups.map((item) => (
-              <View key={item.id} style={styles.groupCard}>
+              <TouchableOpacity
+                key={item.id}
+                style={styles.groupCard}
+                activeOpacity={0.8}
+                onPress={() => router.push({ pathname: '/group/[id]', params: { id: item.id } })}
+              >
                 <View style={styles.groupIconWrap}>
                   <MaterialIcons name="tour" size={24} color="#1E8E3E" />
                 </View>
@@ -276,7 +288,7 @@ export default function Index() {
                 <ThemedText style={styles.groupStatus}>
                   {item.status === "closed" ? "Đã quyết toán" : "Đang hoạt động"}
                 </ThemedText>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         </View>
@@ -315,11 +327,42 @@ export default function Index() {
   );
 }
 
-function mapHomeActivity(group: HomeGroup, activity: any): HomeActivity & { sortKey: number } {
+function mapHomeActivity(group: HomeGroup, activity: any, currentUserId?: string): HomeActivity & { sortKey: number } {
   const description = localizeHomeActivity(group, activity);
   const createdAt = activity.createdAt ?? activity.time ?? new Date().toISOString();
-  const money = typeof activity.amount === "number" ? activity.amount : typeof activity.money === "number" ? activity.money : 0;
-  const type: HomeActivity["type"] = money >= 0 ? "received" : "paid";
+  // extract money from several possible shapes returned by APIs or group.latestActivity
+  const money =
+    typeof activity.amount === "number"
+      ? activity.amount
+      : typeof activity.money === "number"
+      ? activity.money
+      : typeof activity?.after?.amount === "number"
+      ? activity.after.amount
+      : typeof activity?.after?.money === "number"
+      ? activity.after.money
+      : typeof activity?.before?.amount === "number"
+      ? activity.before.amount
+      : typeof activity?.before?.money === "number"
+      ? activity.before.money
+      : 0;
+  // Determine type relative to current user when possible
+  let type: HomeActivity["type"] = money >= 0 ? "received" : "paid";
+  try {
+    const action = String(activity.action ?? "").toLowerCase();
+    if (action.startsWith("expense")) {
+      const paidBy = activity?.after?.paidByUserId ?? activity?.before?.paidByUserId ?? activity?.paidByUserId;
+      const participants = activity?.after?.participants ?? activity?.before?.participants ?? activity?.participants ?? [];
+      if (currentUserId) {
+        if (paidBy === currentUserId) {
+          type = "received";
+        } else if (Array.isArray(participants) && participants.some((p: any) => p.userId === currentUserId)) {
+          type = "paid";
+        }
+      }
+    }
+  } catch (e) {
+    // fallback to money sign
+  }
 
   return {
     id: String(activity.id ?? `${group.id}-${createdAt}`),
@@ -455,6 +498,9 @@ const styles = StyleSheet.create({
   dualLabel: {
     fontSize: 14,
   },
+  dualLabelDark: {
+    color: "#3c3c3c",
+  },
   heroPill: {
     backgroundColor: "rgba(34, 197, 94, 0.12)",
     paddingVertical: 12,
@@ -478,6 +524,12 @@ const styles = StyleSheet.create({
   },
   dualValue: {
     fontSize: 18,
+  },
+  dualAmountDebt: {
+    color: "#b53825",
+  },
+  dualAmountReceive: {
+    color: "#199e66",
   },
   section: {
     gap: 12,

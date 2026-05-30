@@ -50,6 +50,7 @@ export default function AddExpenseScreen() {
     string[]
   >([]);
   const [participantAmounts, setParticipantAmounts] = useState<Record<string, string>>({});
+  const [participantPercents, setParticipantPercents] = useState<Record<string, string>>({});
 
   const parsedAmount = Number(amount.replace(/[^0-9]/g, "")) || 0;
   const selectedCount = selectedParticipantIds.length || 1;
@@ -68,16 +69,34 @@ export default function AddExpenseScreen() {
   }, [parsedAmount, selectedCount, splitMode, sumParticipantAmounts]);
 
   const formatCurrency = (value: number) => `${value.toLocaleString("vi-VN")}đ`;
+  const sumParticipantPercents = useMemo(() => {
+    return Object.values(participantPercents).reduce((acc, v) => acc + (Number(v) || 0), 0);
+  }, [participantPercents]);
+
   useEffect(() => {
-    if (splitMode !== "SỐ TIỀN") return;
     if (!selectedParticipantIds || selectedParticipantIds.length === 0) return;
-    if (sumParticipantAmounts === 0) {
-      const defaultAmount = Math.floor(parsedAmount / Math.max(1, selectedParticipantIds.length));
-      const initial: Record<string, string> = {};
-      selectedParticipantIds.forEach((id) => (initial[id] = String(defaultAmount)));
-      setParticipantAmounts((cur) => ({ ...initial, ...cur }));
+
+    if (splitMode === "SỐ TIỀN") {
+      if (sumParticipantAmounts === 0) {
+        const defaultAmount = Math.floor(parsedAmount / Math.max(1, selectedParticipantIds.length));
+        const initial: Record<string, string> = {};
+        selectedParticipantIds.forEach((id) => (initial[id] = String(defaultAmount)));
+        setParticipantAmounts((cur) => ({ ...initial, ...cur }));
+      }
+    } else if (splitMode === "%") {
+      if (sumParticipantPercents === 0) {
+        const base = Math.floor(100 / Math.max(1, selectedParticipantIds.length));
+        let remainder = 100 - base * selectedParticipantIds.length;
+        const initial: Record<string, string> = {};
+        selectedParticipantIds.forEach((id) => {
+          const v = base + (remainder > 0 ? 1 : 0);
+          if (remainder > 0) remainder -= 1;
+          initial[id] = String(v);
+        });
+        setParticipantPercents((cur) => ({ ...initial, ...cur }));
+      }
     }
-  }, [parsedAmount, selectedParticipantIds, splitMode, sumParticipantAmounts]);
+  }, [parsedAmount, selectedParticipantIds, splitMode, sumParticipantAmounts, sumParticipantPercents]);
 
   const toggleParticipant = (participantId: string) => {
     setSelectedParticipantIds((current) =>
@@ -94,6 +113,16 @@ export default function AddExpenseScreen() {
 
       const defaultAmount = Math.floor(parsedAmount / Math.max(1, selectedParticipantIds.length + 1));
       return { ...cur, [participantId]: String(defaultAmount) };
+    });
+    setParticipantPercents((cur) => {
+      if (cur[participantId]) {
+        const copy = { ...cur };
+        delete copy[participantId];
+        return copy;
+      }
+
+      const defaultPercent = Math.floor(100 / Math.max(1, selectedParticipantIds.length + 1));
+      return { ...cur, [participantId]: String(defaultPercent) };
     });
   };
 
@@ -176,6 +205,19 @@ export default function AddExpenseScreen() {
           value: Math.round(Number(participantAmounts[userId]) || 0),
         }));
         payloadSplitMode = 'amount';
+      } else if (splitMode === '%') {
+        // validate percents sum to 100
+        if (sumParticipantPercents !== 100) {
+          setIsSaving(false);
+          showFeedback('error', 'Sai thông tin', 'Tổng % phải bằng 100%.');
+          return;
+        }
+
+        participants = selectedParticipantIds.map((userId) => ({
+          userId,
+          value: Math.round(Number(participantPercents[userId]) || 0),
+        }));
+        payloadSplitMode = 'percent';
       } else {
         const base = Math.floor(parsedAmount / selectedParticipantIds.length);
         let remainder = parsedAmount - base * selectedParticipantIds.length;
@@ -244,6 +286,16 @@ export default function AddExpenseScreen() {
         const initialAmounts: Record<string, string> = {};
         ids.forEach((uid) => (initialAmounts[uid] = String(defaultAmount)));
         setParticipantAmounts(initialAmounts);
+        // initialize percent splits equally
+        const base = ids.length ? Math.floor(100 / ids.length) : 0;
+        let remainder = 100 - base * ids.length;
+        const initialPercents: Record<string, string> = {};
+        ids.forEach((uid) => {
+          const v = base + (remainder > 0 ? 1 : 0);
+          if (remainder > 0) remainder -= 1;
+          initialPercents[uid] = String(v);
+        });
+        setParticipantPercents(initialPercents);
 
         if (response.length > 0) {
           setPayer(response[0].displayName);
@@ -749,6 +801,77 @@ export default function AddExpenseScreen() {
                   style={{ color: darkGreen, fontSize: 16, fontWeight: "700" }}
                 >
                   {formatCurrency(perPersonAmount)}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          
+          {splitMode === "%" && (
+            <View
+              style={{
+                marginTop: 10,
+                backgroundColor: backgroundWhite,
+                borderRadius: 12,
+                padding: 12,
+                gap: 8,
+              }}
+            >
+              <Text style={{ fontSize: 16, fontWeight: "700", color: textColor }}>
+                Nhập % cho từng người
+              </Text>
+
+              {selectedParticipantIds.map((uid) => {
+                const member = members.find((m) => m.userId === uid);
+                const percentStr = participantPercents[uid] || "";
+                const amount = Math.round(((Number(percentStr) || 0) / 100) * parsedAmount);
+                return (
+                  <View
+                    key={uid}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
+                    }}
+                  >
+                    <Text style={{ flex: 1, color: textColor }}>{member?.displayName}</Text>
+                    <View style={{ width: 160, flexDirection: "row", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
+                      <TextInput
+                        value={percentStr}
+                        onChangeText={(v) =>
+                          setParticipantPercents((cur) => ({ ...cur, [uid]: v.replace(/[^0-9]/g, "") }))
+                        }
+                        keyboardType="number-pad"
+                        placeholder="0"
+                        placeholderTextColor="#9CA3AF"
+                        style={{
+                          width: 70,
+                          textAlign: "right",
+                          backgroundColor: "#F3F4F6",
+                          paddingHorizontal: 10,
+                          paddingVertical: 8,
+                          borderRadius: 8,
+                          color: textColor,
+                          fontWeight: "700",
+                        }}
+                      />
+                      <Text style={{ color: textColor, fontWeight: "700" }}>%</Text>
+                      <Text style={{ color: "#6B7280" }}>{formatCurrency(amount)}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+
+              <View style={{ height: 1, backgroundColor: "#E6E6E6" }} />
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ color: textColor }}>Tổng %</Text>
+                <Text style={{ color: textColor, fontWeight: "700" }}>{sumParticipantPercents}%</Text>
+              </View>
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ color: textColor }}>Còn lại</Text>
+                <Text style={{ color: sumParticipantPercents === 100 ? darkGreen : "#B91C1C", fontWeight: "700" }}>
+                  {100 - sumParticipantPercents}%
                 </Text>
               </View>
             </View>

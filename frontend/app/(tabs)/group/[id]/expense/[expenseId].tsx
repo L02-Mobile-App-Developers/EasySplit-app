@@ -2,7 +2,7 @@ import TopAppBar from "@/components/TopAppBar";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useLocalSearchParams, router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Image, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 
 import { expenseService } from "@/api/services/expense.service";
@@ -41,6 +41,7 @@ export default function ExpenseDetailScreen() {
   }, [expense]);
 
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showPercentModal, setShowPercentModal] = useState(false);
 
   const splitLabel = useMemo(() => {
     if (!expense) return "Chia đều";
@@ -121,17 +122,38 @@ export default function ExpenseDetailScreen() {
           <View style={{ marginBottom: 12 }}>
             <Text style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 8 }}>NGƯỜI THAM GIA ({expense.participants.length})</Text>
             <View style={{ flexDirection: "column", gap: 8 }}>
-              {expense.participants.map((p) => (
-                <View key={p.userId} style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                  <Image source={{ uri: p.user?.avatarUrl || "https://ui-avatars.com/api/?name=User" }} style={{ width: 36, height: 36, borderRadius: 999 }} />
-                  <Text style={{ color: "#374151", fontWeight: "600", flex: 1 }}>{p.user?.displayName ?? p.userId}</Text>
-                  <Text style={{ fontWeight: "700" }}>{formatCurrency(p.value)}</Text>
-                </View>
-              ))}
+              {expense.participants.map((p) => {
+                const isPercent = expense.splitMode === "percent";
+                const percent = p.value ?? 0;
+                const amountNum = isPercent ? Math.round((percent / 100) * (expense.amount ?? 0)) : p.value ?? 0;
+
+                return (
+                  <View key={p.userId} style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <Image source={{ uri: p.user?.avatarUrl || "https://ui-avatars.com/api/?name=User" }} style={{ width: 36, height: 36, borderRadius: 999 }} />
+                    <Text style={{ color: "#374151", fontWeight: "600", flex: 1 }}>{p.user?.displayName ?? p.userId}</Text>
+                    <View style={{ alignItems: "flex-end" }}>
+                      {isPercent ? (
+                        <>
+                          <Text style={{ fontWeight: "700" }}>{`${percent}%`}</Text>
+                          <Text style={{ color: "#6B7280", marginTop: 4 }}>{formatCurrency(amountNum)}</Text>
+                        </>
+                      ) : (
+                        <Text style={{ fontWeight: "700" }}>{formatCurrency(amountNum)}</Text>
+                      )}
+                    </View>
+                  </View>
+                );
+              })}
             </View>
           </View>
 
-          <View style={{ backgroundColor: "#ECFDF5", padding: 12, borderRadius: 12, marginBottom: 12 }}>
+          <TouchableOpacity
+            activeOpacity={expense.splitMode === "percent" ? 0.8 : 1}
+            onPress={() => {
+              if (expense?.splitMode === "percent") setShowPercentModal(true);
+            }}
+            style={{ backgroundColor: "#ECFDF5", padding: 12, borderRadius: 12, marginBottom: 12 }}
+          >
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
               <Text style={{ color: darkGreen, fontWeight: "700" }}>CÁCH CHIA</Text>
               {expense.splitMode === 'equal' ? (
@@ -140,7 +162,7 @@ export default function ExpenseDetailScreen() {
                 <Text style={{ color: darkGreen, fontWeight: "800" }}>{splitLabel}</Text>
               )}
             </View>
-          </View>
+          </TouchableOpacity>
 
           {/* Notes and txn if available in metadata */}
           <View style={{ marginBottom: 12 }}>
@@ -235,6 +257,45 @@ export default function ExpenseDetailScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      <Modal
+        visible={showPercentModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowPercentModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: backgroundWhite }]}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <Text style={{ fontSize: 18, fontWeight: "800", color: textColor }}>Chi tiết chia %</Text>
+              <TouchableOpacity onPress={() => setShowPercentModal(false)}>
+                <Text style={{ color: darkGreen, fontWeight: "700" }}>Đóng</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ height: 1, backgroundColor: "#F3F4F6", marginBottom: 12 }} />
+
+            <ScrollView>
+              {expense?.participants?.map((p) => {
+                // if participants' values represent percents (when backend uses percent), show percent and computed amount
+                const percent = p.value ?? 0;
+                const amountNum = Math.round((percent / 100) * (expense.amount ?? 0));
+                return (
+                  <View key={p.userId} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 10 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <Image source={{ uri: p.user?.avatarUrl || "https://ui-avatars.com/api/?name=User" }} style={{ width: 36, height: 36, borderRadius: 999 }} />
+                      <Text style={{ fontWeight: "700", color: textColor }}>{p.user?.displayName ?? p.userId}</Text>
+                    </View>
+                    <View style={{ alignItems: "flex-end" }}>
+                      <Text style={{ fontWeight: "700" }}>{percent}%</Text>
+                      <Text style={{ color: "#6B7280", marginTop: 4 }}>{formatCurrency(amountNum)}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -253,5 +314,7 @@ const styles = StyleSheet.create({
   partAvatar: { width: 36, height: 36, borderRadius: 18, marginRight: 12 },
   partName: { fontWeight: "700" },
   partValue: { fontWeight: "700" },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
+  modalContent: { padding: 16, borderTopLeftRadius: 12, borderTopRightRadius: 12, maxHeight: "70%" },
 });
 

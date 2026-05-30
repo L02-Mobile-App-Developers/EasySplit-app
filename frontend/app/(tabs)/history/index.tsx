@@ -17,6 +17,8 @@ type HistoryItem = AuditLog & {
     email: string | null;
     avatarUrl?: string | null;
   } | null;
+  sourceGroupId?: string;
+  sourceGroupName?: string;
   before?: any;
   after?: any;
 };
@@ -63,7 +65,7 @@ const TransactionItem: React.FC<{ item: HistoryItem }> = ({ item }) => {
 };
 
 export default function HistoryScreen() {
-  const [activeGroup, setActiveGroup] = useState<Group | null>(null);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [transactions, setTransactions] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -71,8 +73,8 @@ export default function HistoryScreen() {
   const setHistoryCache = useHistoryStore((s) => s.setCache);
   const invalidateHistoryCache = useHistoryStore((s) => s.invalidate);
 
-  const applyHistoryCache = useCallback((data: { activeGroup: Group | null; transactions: HistoryItem[] }) => {
-    setActiveGroup(data.activeGroup ?? null);
+  const applyHistoryCache = useCallback((data: { groups: Group[]; transactions: HistoryItem[] }) => {
+    setGroups(data.groups ?? []);
     setTransactions(data.transactions ?? []);
     setError(null);
   }, []);
@@ -83,23 +85,44 @@ export default function HistoryScreen() {
 
     try {
       const groupData = await groupService.getGroups();
-      const selectedGroup = groupData.find((group) => group.status === "active") ?? groupData[0] ?? null;
-
-      if (!selectedGroup) {
-        const empty = { activeGroup: null, transactions: [] };
+      if (!groupData.length) {
+        const empty = { groups: [], transactions: [] };
         applyHistoryCache(empty);
         setHistoryCache(empty);
         return;
       }
 
-      const history = await activityService.getHistory(selectedGroup.id);
-      const data = { activeGroup: selectedGroup, transactions: history.items as HistoryItem[] };
+      const histories = await Promise.allSettled(
+        groupData.map(async (group) => {
+          const collected: HistoryItem[] = [];
+          let page = 1;
+          let totalPages = 1;
+
+          do {
+            const history = await activityService.getHistory(group.id, { page, limit: 50 });
+            totalPages = history.pagination?.totalPages ?? 1;
+            (history.items ?? []).forEach((item) => {
+              collected.push({
+                ...(item as HistoryItem),
+                sourceGroupId: group.id,
+                sourceGroupName: group.name,
+              });
+            });
+            page += 1;
+          } while (page <= totalPages);
+
+          return collected;
+        }),
+      );
+
+      const merged = histories.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
+      const data = { groups: groupData, transactions: merged };
       applyHistoryCache(data);
       setHistoryCache(data);
     } catch (fetchError) {
       console.log("Get history error:", fetchError);
       setError("Không thể tải lịch sử.");
-      applyHistoryCache({ activeGroup: null, transactions: [] });
+      applyHistoryCache({ groups: [], transactions: [] });
     } finally {
       if (!silent) setLoading(false);
     }
@@ -146,7 +169,7 @@ export default function HistoryScreen() {
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryTitle}>Lịch sử tài chính</Text>
-            <Text style={styles.summarySubtitle}>{activeGroup ? `Nhóm: ${activeGroup.name}` : "Bạn chưa có nhóm nào"}</Text>
+            <Text style={styles.summarySubtitle}>Tổng quan về các hoạt động gần đây</Text>
             <Text style={styles.summaryAmount}>{transactions.length} mục</Text>
           </View>
 
@@ -177,9 +200,9 @@ export default function HistoryScreen() {
                 <Text style={styles.sectionBadgeText}>{section}</Text>
               </View>
 
-              {items.map((item) => (
-                <TransactionItem key={item.id} item={item} />
-              ))}
+                  {items.map((item) => (
+                    <TransactionItem key={`${item.sourceGroupId ?? "group"}-${item.id}`} item={item} />
+                  ))}
             </View>
           ))}
         </ScrollView>
@@ -217,19 +240,29 @@ function mapHistoryItem(item: HistoryItem) {
   const entityLabel = getEntityLabel(item.entityType);
   const amount = formatMoney(item.after?.amount ?? item.before?.amount, item.after?.currency ?? item.before?.currency ?? "đ");
 
+  const groupName = item.sourceGroupName ? ` trong nhóm ${item.sourceGroupName}` : "";
+
+  // If backend mis-classified expense audit as entityType 'group', detect by action prefix
+  const isExpenseAction = item.entityType === "expense" || item.action.startsWith("expense_");
+  const effectiveEntityLabel = isExpenseAction ? getEntityLabel("expense") : entityLabel;
+
+  const titleBase = `${actorName} ${actionLabel} ${effectiveEntityLabel}${groupName}`;
+
+  const subtitle = new Intl.DateTimeFormat("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+  }).format(new Date(item.createdAt));
+
   return {
-    icon: getEntityIcon(item.entityType),
-    iconBg: getEntityColor(item.entityType),
-    title: `${actorName} ${actionLabel} ${entityLabel}`,
-    subtitle: new Intl.DateTimeFormat("vi-VN", {
-      hour: "2-digit",
-      minute: "2-digit",
-      day: "2-digit",
-      month: "2-digit",
-    }).format(new Date(item.createdAt)),
+    icon: getEntityIcon(isExpenseAction ? "expense" : item.entityType),
+    iconBg: getEntityColor(isExpenseAction ? "expense" : item.entityType),
+    title: titleBase,
+    subtitle: item.sourceGroupName ? `${subtitle} • ${item.sourceGroupName}` : subtitle,
     amount,
     amountColor: item.action.includes("delete") ? "#BA1A1A" : "#0F172A",
-    amountHighlight: item.entityType === "expense" && item.after?.description ? item.after.description : undefined,
+    amountHighlight: (isExpenseAction || item.entityType === "expense") && item.after?.description ? item.after.description : undefined,
   };
 }
 

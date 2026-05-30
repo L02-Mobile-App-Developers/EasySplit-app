@@ -18,7 +18,6 @@ interface TopAppBarProps {
   showSearch?: boolean;
   showSettings?: boolean;
   onBackPress?: () => void;
-  onSearchPress?: () => void;
   onSettingsPress?: () => void;
   rightContent?: ReactNode;
 }
@@ -28,7 +27,6 @@ const TopAppBar: React.FC<TopAppBarProps> = ({
   showSearch = false,
   showSettings = false,
   onBackPress,
-  onSearchPress,
   onSettingsPress,
   rightContent,
 }) => {
@@ -72,24 +70,13 @@ const TopAppBar: React.FC<TopAppBarProps> = ({
                 {title}
               </Text>
               <Text style={[styles.subtitle, { color: selected }]} numberOfLines={1}>
-                Manage your split expenses
+                Split the bill, keep the chill
               </Text>
             </View>
           </View>
 
           <View style={styles.rightSection}>
             {rightContent}
-            {showSearch && (
-              <Pressable
-                onPress={onSearchPress}
-                style={({ pressed }) => [
-                  styles.iconButton,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <EvilIcons name="search" size={26} color={darkGreen} />
-              </Pressable>
-            )}
             {showSettings && (
               <Pressable
                 onPress={onSettingsPress}

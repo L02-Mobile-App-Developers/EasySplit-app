@@ -1,8 +1,9 @@
 import { create } from "zustand";
 
 type HistoryCacheEntry = {
-  activeGroup: any | null;
+  groups: any[];
   transactions: any[];
+  activeGroup?: any | null;
 };
 
 interface HistoryStore {

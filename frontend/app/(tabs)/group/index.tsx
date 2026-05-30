@@ -122,7 +122,6 @@ export default function GroupScreen() {
         title="Nhóm"
         showSearch
         showSettings
-        onSearchPress={handleSearch}
         onSettingsPress={handleSettings}
       />
 
