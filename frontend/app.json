@@ -8,6 +8,12 @@
     "scheme": "easysplit",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/cf7d5f32-3b1b-438c-bc99-5247fe817084"
+    },
 
     "ios": {
       "supportsTablet": true,
