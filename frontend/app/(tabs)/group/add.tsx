@@ -111,7 +111,7 @@ export default function AddGroupScreen() {
                   style={[styles.categoryCard, active ? styles.categoryCardActive : styles.categoryCardInactive]}
                 >
                   <View style={[styles.categoryIcon, active ? styles.categoryIconActive : styles.categoryIconInactive]}>
-                    <MaterialIcons name={active ? "check-circle" : "radio-button-unchecked"} size={18} color={active ? "#FFFFFF" : "#0F5E28"} />
+                    <MaterialIcons name={active ? "check-circle" : "radio-button-unchecked"} size={18} color={active ? "#FFFFFF" : "#69ac7e"} />
                   </View>
                   <Text style={styles.categoryTitle}>{item.label}</Text>
                   <Text style={styles.categoryHint}>{item.hint}</Text>
