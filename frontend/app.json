@@ -4,7 +4,7 @@
     "slug": "frontend",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/logo-removebg.png",
+    "icon": "./assets/images/logo-removebg_360x360.png",
     "scheme": "easysplit",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
