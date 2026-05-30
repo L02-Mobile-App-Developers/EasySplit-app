@@ -168,7 +168,7 @@ export default function Register() {
                 placeholder="Mật khẩu"
                 placeholderTextColor={placeholderGray}
                 secureTextEntry
-                style={styles.input}
+                style={[styles.input, { color: textColor }]}
               />
             </View>
 
@@ -180,7 +180,7 @@ export default function Register() {
                 placeholder="Xác nhận mật khẩu"
                 placeholderTextColor={placeholderGray}
                 secureTextEntry
-                style={styles.input}
+                style={[styles.input, { color: textColor }]}
               />
             </View>
 

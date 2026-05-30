@@ -134,7 +134,11 @@ export default function ExpenseDetailScreen() {
           <View style={{ backgroundColor: "#ECFDF5", padding: 12, borderRadius: 12, marginBottom: 12 }}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
               <Text style={{ color: darkGreen, fontWeight: "700" }}>CÁCH CHIA</Text>
-              <Text style={{ color: darkGreen, fontWeight: "800" }}>{splitLabel} • {formatCurrency(perPerson)}/ng</Text>
+              {expense.splitMode === 'equal' ? (
+                <Text style={{ color: darkGreen, fontWeight: "800" }}>{splitLabel} • {formatCurrency(perPerson)}/ng</Text>
+              ) : (
+                <Text style={{ color: darkGreen, fontWeight: "800" }}>{splitLabel}</Text>
+              )}
             </View>
           </View>
 

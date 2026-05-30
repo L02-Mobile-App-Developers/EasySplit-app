@@ -88,7 +88,7 @@ export default function Login() {
                 placeholder="Mật khẩu"
                 placeholderTextColor={placeholderGray}
                 secureTextEntry
-                style={styles.input}
+                style={[styles.input, { color: textColor }]}
               />
             </View>
 

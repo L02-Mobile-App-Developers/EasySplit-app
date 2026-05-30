@@ -49,17 +49,35 @@ export default function AddExpenseScreen() {
   const [selectedParticipantIds, setSelectedParticipantIds] = useState<
     string[]
   >([]);
+  const [participantAmounts, setParticipantAmounts] = useState<Record<string, string>>({});
 
   const parsedAmount = Number(amount.replace(/[^0-9]/g, "")) || 0;
   const selectedCount = selectedParticipantIds.length || 1;
   const groupId = Array.isArray(id) ? id[0] : id;
 
+  const sumParticipantAmounts = useMemo(() => {
+    return Object.values(participantAmounts).reduce((acc, v) => acc + (Number(v) || 0), 0);
+  }, [participantAmounts]);
+
   const perPersonAmount = useMemo(() => {
     if (!selectedCount) return 0;
+    if (splitMode === "SỐ TIỀN") {
+      return Math.floor((sumParticipantAmounts || 0) / selectedCount);
+    }
     return Math.floor(parsedAmount / selectedCount);
-  }, [parsedAmount, selectedCount]);
+  }, [parsedAmount, selectedCount, splitMode, sumParticipantAmounts]);
 
   const formatCurrency = (value: number) => `${value.toLocaleString("vi-VN")}đ`;
+  useEffect(() => {
+    if (splitMode !== "SỐ TIỀN") return;
+    if (!selectedParticipantIds || selectedParticipantIds.length === 0) return;
+    if (sumParticipantAmounts === 0) {
+      const defaultAmount = Math.floor(parsedAmount / Math.max(1, selectedParticipantIds.length));
+      const initial: Record<string, string> = {};
+      selectedParticipantIds.forEach((id) => (initial[id] = String(defaultAmount)));
+      setParticipantAmounts((cur) => ({ ...initial, ...cur }));
+    }
+  }, [parsedAmount, selectedParticipantIds, splitMode, sumParticipantAmounts]);
 
   const toggleParticipant = (participantId: string) => {
     setSelectedParticipantIds((current) =>
@@ -67,6 +85,16 @@ export default function AddExpenseScreen() {
         ? current.filter((idValue) => idValue !== participantId)
         : [...current, participantId],
     );
+    setParticipantAmounts((cur) => {
+      if (cur[participantId]) {
+        const copy = { ...cur };
+        delete copy[participantId];
+        return copy;
+      }
+
+      const defaultAmount = Math.floor(parsedAmount / Math.max(1, selectedParticipantIds.length + 1));
+      return { ...cur, [participantId]: String(defaultAmount) };
+    });
   };
 
   const goBackToGroupDetail = () => {
@@ -128,21 +156,43 @@ export default function AddExpenseScreen() {
       }
 
       setIsSaving(true);
+      let participants: { userId: string; value: number }[] = [];
+      let payloadSplitMode: CreateExpenseRequest['splitMode'] = 'equal';
 
-      const base = Math.floor(parsedAmount / selectedParticipantIds.length);
-      let remainder = parsedAmount - base * selectedParticipantIds.length;
-      const participants = selectedParticipantIds.map((userId) => {
-        const value = base + (remainder > 0 ? 1 : 0);
-        if (remainder > 0) remainder -= 1;
-        return { userId, value };
-      });
+      if (splitMode === 'SỐ TIỀN') {
+        // validate sum matches total
+        if (sumParticipantAmounts !== parsedAmount) {
+          setIsSaving(false);
+          showFeedback(
+            'error',
+            'Sai thông tin',
+            'Tổng số tiền của các thành viên phải bằng tổng khoản chi.',
+          );
+          return;
+        }
+
+        participants = selectedParticipantIds.map((userId) => ({
+          userId,
+          value: Math.round(Number(participantAmounts[userId]) || 0),
+        }));
+        payloadSplitMode = 'amount';
+      } else {
+        const base = Math.floor(parsedAmount / selectedParticipantIds.length);
+        let remainder = parsedAmount - base * selectedParticipantIds.length;
+        participants = selectedParticipantIds.map((userId) => {
+          const value = base + (remainder > 0 ? 1 : 0);
+          if (remainder > 0) remainder -= 1;
+          return { userId, value };
+        });
+        payloadSplitMode = 'equal';
+      }
 
       const payload: CreateExpenseRequest = {
         description: expenseName.trim(),
         amount: parsedAmount,
-        currency: "VND",
+        currency: 'VND',
         paidByUserId: selectedPayerId,
-        splitMode: "equal",
+        splitMode: payloadSplitMode,
         participants,
       };
 
@@ -188,7 +238,12 @@ export default function AddExpenseScreen() {
 
         setMembers(response);
 
-        setSelectedParticipantIds(response.map((member) => member.userId));
+        const ids = response.map((member) => member.userId);
+        setSelectedParticipantIds(ids);
+        const defaultAmount = ids.length ? Math.floor(parsedAmount / ids.length) : 0;
+        const initialAmounts: Record<string, string> = {};
+        ids.forEach((uid) => (initialAmounts[uid] = String(defaultAmount)));
+        setParticipantAmounts(initialAmounts);
 
         if (response.length > 0) {
           setPayer(response[0].displayName);
@@ -588,47 +643,116 @@ export default function AddExpenseScreen() {
             </View>
           </View>
 
-          <View
-            style={{
-              marginTop: 10,
-              backgroundColor: "#EAF3EE",
-              borderRadius: 18,
-              padding: 16,
-              gap: 12,
-            }}
-          >
+            {splitMode === "SỐ TIỀN" && (
+              <View
+                style={{
+                  marginTop: 10,
+                  backgroundColor: backgroundWhite,
+                  borderRadius: 12,
+                  padding: 12,
+                  gap: 8,
+                }}
+              >
+                <Text style={{ fontSize: 16, fontWeight: "700", color: textColor }}>
+                  Nhập số tiền từng người
+                </Text>
+
+                {selectedParticipantIds.map((uid) => {
+                  const member = members.find((m) => m.userId === uid);
+                  return (
+                    <View
+                      key={uid}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
+                      }}
+                    >
+                      <Text style={{ flex: 1, color: textColor }}>{member?.displayName}</Text>
+                      <TextInput
+                        value={participantAmounts[uid] || ""}
+                        onChangeText={(v) =>
+                          setParticipantAmounts((cur) => ({
+                            ...cur,
+                            [uid]: v.replace(/[^0-9]/g, ""),
+                          }))
+                        }
+                        keyboardType="number-pad"
+                        placeholder="0"
+                        placeholderTextColor="#9CA3AF"
+                        style={{
+                          width: 130,
+                          textAlign: "right",
+                          backgroundColor: "#F3F4F6",
+                          paddingHorizontal: 10,
+                          paddingVertical: 8,
+                          borderRadius: 8,
+                          color: textColor,
+                          fontWeight: "700",
+                        }}
+                      />
+                    </View>
+                  );
+                })}
+
+                <View style={{ height: 1, backgroundColor: "#E6E6E6" }} />
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <Text style={{ color: textColor }}>Tổng đã phân</Text>
+                  <Text style={{ color: textColor, fontWeight: "700" }}>{formatCurrency(sumParticipantAmounts)}</Text>
+                </View>
+                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                  <Text style={{ color: textColor }}>Còn lại</Text>
+                  <Text style={{ color: parsedAmount - sumParticipantAmounts === 0 ? darkGreen : "#B91C1C", fontWeight: "700" }}>
+                    {formatCurrency(parsedAmount - sumParticipantAmounts)}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+          {splitMode === "CHIA ĐỀU" && (
             <View
               style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
+                marginTop: 10,
+                backgroundColor: "#EAF3EE",
+                borderRadius: 18,
+                padding: 16,
+                gap: 12,
               }}
             >
-              <Text style={{ color: textColor, fontSize: 15 }}>Tổng tiền</Text>
-              <Text
-                style={{ color: textColor, fontSize: 15, fontWeight: "700" }}
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
               >
-                {formatCurrency(parsedAmount)}
-              </Text>
-            </View>
-            <View style={{ height: 1, backgroundColor: "#D9E3DC" }} />
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <Text style={{ color: textColor, fontSize: 15 }}>
-                Mỗi người ({selectedCount})
-              </Text>
-              <Text
-                style={{ color: darkGreen, fontSize: 16, fontWeight: "700" }}
+                <Text style={{ color: textColor, fontSize: 15 }}>Tổng tiền</Text>
+                <Text
+                  style={{ color: textColor, fontSize: 15, fontWeight: "700" }}
+                >
+                  {formatCurrency(parsedAmount)}
+                </Text>
+              </View>
+              <View style={{ height: 1, backgroundColor: "#D9E3DC" }} />
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
               >
-                {formatCurrency(perPersonAmount)}
-              </Text>
+                <Text style={{ color: textColor, fontSize: 15 }}>
+                  Mỗi người ({selectedCount})
+                </Text>
+                <Text
+                  style={{ color: darkGreen, fontSize: 16, fontWeight: "700" }}
+                >
+                  {formatCurrency(perPersonAmount)}
+                </Text>
+              </View>
             </View>
-          </View>
+          )}
 
           <Pressable
             onPress={handleSave}
