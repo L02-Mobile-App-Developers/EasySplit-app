@@ -32,6 +32,7 @@ export default function Register() {
   const surface = "#FFFFFF";
   const surfaceVariant = "#F7F9F7";
   const outline = lightGray;
+  const passwordTooShort = password.length > 0 && password.length < 6;
 
   const goBack = () => {
     if (router.canGoBack()) {
@@ -46,6 +47,12 @@ export default function Register() {
 
     if (!name.trim() || !email.trim() || !password) {
       const message = "Vui lòng điền đầy đủ các trường bắt buộc";
+      setSubmitError(message);
+      Alert.alert("Lỗi", message);
+      return;
+    }
+    if (passwordTooShort) {
+      const message = "Mật khẩu phải có ít nhất 6 ký tự";
       setSubmitError(message);
       Alert.alert("Lỗi", message);
       return;
@@ -162,14 +169,24 @@ export default function Register() {
 
             <View style={[styles.field, { backgroundColor: surfaceVariant, borderColor: outline }]}> 
               <Ionicons name="lock-closed-outline" size={18} color={placeholderGray} />
-              <TextInput
-                value={password}
-                onChangeText={setPassword}
-                placeholder="Mật khẩu"
-                placeholderTextColor={placeholderGray}
-                secureTextEntry
-                style={[styles.input, { color: textColor }]}
-              />
+              <View style={styles.inputWrap}>
+                <TextInput
+                  value={password}
+                  onChangeText={(value) => {
+                    setPassword(value);
+                    if (submitError) setSubmitError(null);
+                  }}
+                  placeholder="Mật khẩu"
+                  placeholderTextColor={placeholderGray}
+                  secureTextEntry
+                  style={[styles.input, { color: textColor }]}
+                />
+                {passwordTooShort ? (
+                  <ThemedText style={styles.passwordHint}>
+                    Mật khẩu phải có ít nhất 6 ký tự.
+                  </ThemedText>
+                ) : null}
+              </View>
             </View>
 
             <View style={[styles.field, { backgroundColor: surfaceVariant, borderColor: outline }]}> 
@@ -307,6 +324,14 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
     paddingVertical: 13,
     fontSize: 15,
+  },
+  inputWrap: {
+    flex: 1,
+  },
+  passwordHint: {
+    marginTop: 6,
+    color: "#B91C1C",
+    fontSize: 12,
   },
   button: {
     marginTop: 18,
