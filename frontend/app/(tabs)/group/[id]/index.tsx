@@ -610,7 +610,7 @@ export default function GroupDetailScreen() {
                       style={styles.debtAvatar}
                     />
 
-                    <View style={{ flex: 1 }}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={{ fontWeight: "700" }}>{user.fromUser?.displayName ?? "Một thành viên"}</Text>
                       <Text style={styles.payAmount}>
                         {currency(user.amount)}
@@ -1091,12 +1091,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#EAF6EE",
     borderRadius: 18,
     padding: 12,
+    gap: 12,
+    flexWrap: "wrap",
   },
 
   debtUser: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    flex: 1,
+    minWidth: 0,
   },
 
   debtAvatar: {
@@ -1122,6 +1126,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 14,
+    flexShrink: 0,
+    alignSelf: "center",
   },
 
   payButtonText: {
