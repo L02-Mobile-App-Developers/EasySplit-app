@@ -23,6 +23,7 @@ import {
 import { balanceService } from "@/api/services/balance.service";
 import { expenseService } from "@/api/services/expense.service";
 import { groupService } from "@/api/services/group.service";
+import { reminderService } from "@/api/services/reminder.service";
 import { settlementService } from "@/api/services/settlement.service";
 import { activityService } from "@/api/services/activity.service";
 
@@ -37,6 +38,12 @@ import { useHomeStore } from "@/store/home.store";
 
 const currency = (value: number) => `${value.toLocaleString("vi-VN")}đ`;
 const darkGreen = "#0F5E28";
+
+// Deterministic avatar generator fallback (uses pravatar with seed to remain stable)
+const avatarFor = (seed?: string | number) => {
+  const s = seed ? String(seed) : Math.random().toString(36).slice(2, 8);
+  return `https://i.pravatar.cc/150?u=${encodeURIComponent(s)}`;
+};
 
 export default function GroupDetailScreen() {
   const { id, refresh } = useLocalSearchParams<{ id: string; refresh?: string }>();
@@ -55,15 +62,36 @@ export default function GroupDetailScreen() {
   const [refreshingDetail, setRefreshingDetail] = useState(false);
 
   const [memberToPay, setMemberToPay] = useState<DebtEdge[]>([]);
+  const [memberOwed, setMemberOwed] = useState<DebtEdge[]>([]);
   const [debts, setDebts] = useState<DebtEdge[]>([]);
   const [history, setHistory] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [reminders, setReminders] = useState<any[]>([]);
+  const [remindersLoading, setRemindersLoading] = useState(false);
+  const [creatingReminders, setCreatingReminders] = useState<Record<string, boolean>>({});
 
   const cachedRole = useGroupStore((s) => (id ? s.roles[id as string] : undefined));
   const getGroupCacheEntry = useGroupStore((s) => s.getGroupCacheEntry);
   const setGroupCache = useGroupStore((s) => s.setGroupCache);
+
+  const resetDetailState = () => {
+    setGroup(undefined);
+    setMembers([]);
+    setExpenses([]);
+    setMyBalance(undefined);
+    setMemberToPay([]);
+    setMemberOwed([]);
+    setDebts([]);
+    setHistory([]);
+    setHistoryLoading(false);
+    setReminders([]);
+    setRemindersLoading(false);
+  };
+
   useEffect(() => {
     if (!id) return;
+
+    resetDetailState();
 
     // Try to load cached data first
     const cacheEntry = getGroupCacheEntry?.(id as string);
@@ -78,7 +106,9 @@ export default function GroupDetailScreen() {
       setMyBalance(data.myBalance ?? undefined);
       setDebts(data.debts ?? []);
       const filtered = (data.debts ?? []).filter((item: any) => item.fromUser?.id === currentUser?.id);
+      const filteredOwed = (data.debts ?? []).filter((item: any) => item.toUser?.id === currentUser?.id);
       setMemberToPay(filtered);
+      setMemberOwed(filteredOwed);
 
       // If cache stale, refresh in background; otherwise still refresh in background to keep data fresh
       const shouldRefresh = !ts || now - ts > TTL;
@@ -98,7 +128,9 @@ export default function GroupDetailScreen() {
             setMyBalance(balanceData);
             setDebts(debtData);
             const filtered2 = debtData.filter((item) => item.fromUser?.id === currentUser?.id);
+            const filteredOwed2 = debtData.filter((item) => item.toUser?.id === currentUser?.id);
             setMemberToPay(filtered2);
+            setMemberOwed(filteredOwed2);
             setGroupCache(id, { group: groupData, members: membersData, expenses: expensePage.items, myBalance: balanceData, debts: debtData });
           } catch (err) {
             console.error("Background refresh failed:", err);
@@ -123,7 +155,9 @@ export default function GroupDetailScreen() {
           setMyBalance(balanceData);
           setDebts(debtData);
           const filtered = debtData.filter((item) => item.fromUser?.id === currentUser?.id);
+          const filteredOwed = debtData.filter((item) => item.toUser?.id === currentUser?.id);
           setMemberToPay(filtered);
+          setMemberOwed(filteredOwed);
           setGroupCache(id, { group: groupData, members: membersData, expenses: expensePage.items, myBalance: balanceData, debts: debtData });
         } catch (error) {
           console.error("Failed to load group detail:", error);
@@ -157,7 +191,69 @@ export default function GroupDetailScreen() {
       }
     };
     fetchHistory();
+
+    const fetchReminders = async () => {
+      setRemindersLoading(true);
+      try {
+        const result = await reminderService.getReminders(id);
+        setReminders(result.data ?? []);
+      } catch (err) {
+        console.error("Failed to load reminders:", err);
+      } finally {
+        setRemindersLoading(false);
+      }
+    };
+    fetchReminders();
   }, [id, refresh]);
+
+  const handleCreateReminder = async (targetUserId?: string) => {
+    if (!id || !targetUserId) return;
+    try {
+      setCreatingReminders((s) => ({ ...s, [targetUserId]: true }));
+
+      const payload = {
+        targetUserIds: [targetUserId],
+        channel: "in_app",
+        messageTemplate: "Nhắc trả nợ",
+      } as any;
+
+      const created = await reminderService.createReminder(id as string, payload);
+
+      // refresh reminders and debts
+      try {
+        const [remRes, debtData] = await Promise.all([
+          reminderService.getReminders(id as string),
+          settlementService.getDebts(id as string),
+        ]);
+
+        setReminders(remRes.data ?? []);
+        setDebts(debtData);
+        const filtered = debtData.filter((item: any) => item.fromUser?.id === currentUser?.id);
+        const filteredOwed = debtData.filter((item: any) => item.toUser?.id === currentUser?.id);
+        setMemberToPay(filtered);
+        setMemberOwed(filteredOwed);
+        setGroupCache?.(id as string, { group, members, expenses, myBalance, debts: debtData });
+      } catch (e) {
+        console.error("Failed to refresh after creating reminder", e);
+      }
+
+      // Navigate to created reminder if returned
+      if (Array.isArray(created) && created.length > 0 && created[0]?.id) {
+        const newId = created[0].id;
+        router.push(`/group/${id}/reminder/${newId}`);
+      } else {
+        if (Platform.OS === "web") window.alert("Nhắc nhở đã được tạo");
+        else Alert.alert("Thành công", "Nhắc nhở đã được tạo");
+      }
+    } catch (err: any) {
+      console.error("Create reminder error", err);
+      const msg = err?.response?.data?.message ?? "Không thể tạo nhắc nhở, thử lại sau.";
+      if (Platform.OS === "web") window.alert(msg);
+      else Alert.alert("Lỗi", msg);
+    } finally {
+      setCreatingReminders((s) => ({ ...s, [targetUserId as string]: false }));
+    }
+  };
 
   useEffect(() => {
     // ensure we have current user loaded so action buttons (leave) can work
@@ -248,9 +344,7 @@ export default function GroupDetailScreen() {
 
           <View style={styles.heroCenter}>
             <Image
-              source={{
-                uri: "https://randomuser.me/api/portraits/men/1.jpg",
-              }}
+              source={{ uri: group?.avatarUrl || avatarFor(group?.id || group?.name) }}
               style={styles.groupImage}
             />
 
@@ -472,11 +566,7 @@ export default function GroupDetailScreen() {
                 >
                   <View style={styles.debtUser}>
                     <Image
-                      source={{
-                        uri:
-                          user.toUser?.avatarUrl ||
-                          "https://randomuser.me/api/portraits/men/1.jpg",
-                      }}
+                      source={{ uri: user.toUser?.avatarUrl || avatarFor(user.toUserId || user.toUser?.id || user.toUser?.displayName) }}
                       style={styles.debtAvatar}
                     />
 
@@ -495,6 +585,51 @@ export default function GroupDetailScreen() {
                     () => router.push(`/group/${id}/pay/${user.toUserId}?amount=${user.amount}`)
                   }>
                     <Text style={styles.payButtonText}>Trả nợ</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* PAY YOU */}
+        {memberOwed.length > 0 && (
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Người nợ bạn</Text>
+
+              <Text style={styles.sectionCount}>{memberOwed.length}</Text>
+            </View>
+
+            <View style={styles.memberList}>
+              {memberOwed.map((user) => (
+                <View key={`${user.fromUserId}-${user.toUserId}`} style={styles.payRow}>
+                  <View style={styles.debtUser}>
+                    <Image
+                      source={{ uri: user.fromUser?.avatarUrl || avatarFor(user.fromUserId || user.fromUser?.id || user.fromUser?.displayName) }}
+                      style={styles.debtAvatar}
+                    />
+
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontWeight: "700" }}>{user.fromUser?.displayName ?? "Một thành viên"}</Text>
+                      <Text style={styles.payAmount}>
+                        {currency(user.amount)}
+                      </Text>
+                    </View>
+
+                    
+                  </View>
+
+                  <TouchableOpacity
+                    style={[styles.payButton, { backgroundColor: "#3b6648" }]}
+                    onPress={() => handleCreateReminder(user.fromUserId)}
+                    disabled={!!creatingReminders[user.fromUserId]}
+                  >
+                    {creatingReminders[user.fromUserId] ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.payButtonText}>Nhắc</Text>
+                    )}
                   </TouchableOpacity>
                 </View>
               ))}
@@ -563,6 +698,47 @@ export default function GroupDetailScreen() {
           )}
         </View>
 
+        {/* REMINDERS */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Nhắc nhở</Text>
+
+            <Text style={styles.sectionCount}>{reminders.length} mục</Text>
+          </View>
+
+          {remindersLoading ? (
+            <ActivityIndicator size="small" />
+          ) : reminders.length === 0 ? (
+            <Text style={{ color: "#6B7280" }}>Chưa có nhắc nhở</Text>
+          ) : (
+            <View style={styles.memberList}>
+              {reminders.map((reminder) => (
+                <TouchableOpacity
+                  key={reminder.id}
+                  activeOpacity={0.85}
+                  onPress={() => router.push(`/group/${id}/reminder/${reminder.id}`)}
+                  style={[styles.expenseRow, { backgroundColor: "#FFF8EC", borderRadius: 18, paddingHorizontal: 12 }]}
+                >
+                  <View style={styles.expenseIcon}>
+                    <MaterialCommunityIcons name="bell-outline" size={18} color="#C2410C" />
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.expenseName} numberOfLines={1}>
+                      Nhắc {reminder.targetUser?.displayName ?? "một thành viên"}
+                    </Text>
+                    <Text style={styles.expenseMeta} numberOfLines={1}>
+                      {reminder.status} • {new Date(reminder.createdAt).toLocaleString("vi-VN")}
+                    </Text>
+                  </View>
+
+                  <Text style={{ color: "#C2410C", fontWeight: "800" }}>Chi tiết</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+
         {/* MEMBERS */}
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
@@ -574,18 +750,10 @@ export default function GroupDetailScreen() {
           <View style={styles.memberList}>
             {members.map((member) => (
               <View key={member.userId} style={styles.memberRow}>
-                {member.avatarUrl ? (
-                  <Image
-                    source={{ uri: member.avatarUrl }}
-                    style={styles.memberAvatarImage}
-                  />
-                ) : (
-                  <View style={styles.memberAvatar}>
-                    <Text style={styles.memberAvatarText}>
-                      {member.displayName.slice(0, 1).toUpperCase()}
-                    </Text>
-                  </View>
-                )}
+                <Image
+                  source={{ uri: member.avatarUrl || avatarFor(member.userId || member.displayName) }}
+                  style={styles.memberAvatarImage}
+                />
 
                 <View style={{ flex: 1 }}>
                   <Text style={styles.memberName}>{member.displayName}</Text>
@@ -916,6 +1084,15 @@ const styles = StyleSheet.create({
     padding: 12,
   },
 
+  payRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#EAF6EE",
+    borderRadius: 18,
+    padding: 12,
+  },
+
   debtUser: {
     flexDirection: "row",
     alignItems: "center",
@@ -930,6 +1107,12 @@ const styles = StyleSheet.create({
 
   debtAmount: {
     color: "#DC2626",
+    fontWeight: "700",
+    marginTop: 2,
+  },
+
+  payAmount: {
+    color: "#0F5E28",
     fontWeight: "700",
     marginTop: 2,
   },

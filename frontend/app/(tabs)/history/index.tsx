@@ -167,11 +167,11 @@ export default function HistoryScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
-          <View style={styles.summaryCard}>
+          {/* <View style={styles.summaryCard}>
             <Text style={styles.summaryTitle}>Lịch sử tài chính</Text>
             <Text style={styles.summarySubtitle}>Tổng quan về các hoạt động gần đây</Text>
             <Text style={styles.summaryAmount}>{transactions.length} mục</Text>
-          </View>
+          </View> */}
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
             <FilterChip label="Tất cả" active />

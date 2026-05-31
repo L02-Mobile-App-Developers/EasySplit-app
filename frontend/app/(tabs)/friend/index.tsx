@@ -190,14 +190,14 @@ export default function FriendScreen() {
       <TopAppBar title="Bạn bè" showSearch showSettings />
 
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.heroCard}>
+        {/* <View style={styles.heroCard}>
           <Text style={[styles.pageTitle, { color: textColor }]}>
             Kết nối và chia sẻ chi tiêu
           </Text>
           <Text style={styles.pageSubtitle}>
             Quản lý lời mời kết bạn, thêm bạn qua email và xem danh sách bạn bè.
           </Text>
-        </View>
+        </View> */}
 
         <TouchableOpacity
           activeOpacity={0.85}
@@ -356,7 +356,7 @@ export default function FriendScreen() {
                     <AntDesign name="delete" size={16} color={textColor} />
                   </TouchableOpacity>
 
-                  <TouchableOpacity
+                  {/* <TouchableOpacity
                     activeOpacity={0.85}
                     onPress={() => router.push("/friend/add")}
                   >
@@ -365,14 +365,14 @@ export default function FriendScreen() {
                       size={24}
                       color={tabIconDefault}
                     />
-                  </TouchableOpacity>
+                  </TouchableOpacity> */}
                 </View>
               </View>
             );
           })}
         </View>
 
-        <View style={styles.helperCard}>
+        {/* <View style={styles.helperCard}>
           <MaterialIcons name="group-add" size={28} color={darkGreen} />
           <View style={{ flex: 1 }}>
             <Text style={[styles.helperTitle, { color: textColor }]}>
@@ -388,7 +388,7 @@ export default function FriendScreen() {
           >
             <Text style={{ color: darkGreen, fontWeight: "800" }}>Mời</Text>
           </TouchableOpacity>
-        </View>
+        </View> */}
       </ScrollView>
     </View>
   );

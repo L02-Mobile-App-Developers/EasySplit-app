@@ -2,7 +2,7 @@ import { apiClient } from "../client";
 import { ENDPOINTS } from "../endpoints";
 
 import type { User } from "../types/auth";
-import { Subscription, Usage } from "../types/me";
+import type { Subscription, Usage } from "../types/me";
 
 import type { ApiSuccessResponse } from "../types/response";
 

@@ -268,7 +268,7 @@ export default function PayScreen() {
                       fontWeight: "600",
                     }}
                   >
-                    Nợ bạn {formatMoney(item.amount)}
+                  {formatMoney(item.amount)}
                   </Text>
                 </View>
               </View>

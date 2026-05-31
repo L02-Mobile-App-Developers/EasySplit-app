@@ -20,7 +20,12 @@ apiClient.interceptors.request.use(async (config) => {
   const token = await tokenStorage.getAccessToken();
 
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+    if (typeof (config.headers as any)?.set === "function") {
+      (config.headers as any).set("Authorization", `Bearer ${token}`);
+    } else {
+      config.headers = config.headers ?? {};
+      (config.headers as any).Authorization = `Bearer ${token}`;
+    }
   }
 
   return config;
