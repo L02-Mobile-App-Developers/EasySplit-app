@@ -620,7 +620,7 @@ export default function GroupDetailScreen() {
                     
                   </View>
 
-                  <TouchableOpacity
+                  {/* <TouchableOpacity
                     style={[styles.payButton, { backgroundColor: "#3b6648" }]}
                     onPress={() => handleCreateReminder(user.fromUserId)}
                     disabled={!!creatingReminders[user.fromUserId]}
@@ -630,7 +630,7 @@ export default function GroupDetailScreen() {
                     ) : (
                       <Text style={styles.payButtonText}>Nhắc</Text>
                     )}
-                  </TouchableOpacity>
+                  </TouchableOpacity> */}
                 </View>
               ))}
             </View>
