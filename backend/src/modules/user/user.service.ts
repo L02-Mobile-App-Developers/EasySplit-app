@@ -13,10 +13,18 @@ import {
   Subscription,
   subscriptionId,
 } from "../../lib/firestore-db";
+import type { PlanStatus, SubscriptionStatus } from "../../types";
 
 interface UpdateProfileInput {
   displayName?: string;
   avatarUrl?: string | null;
+}
+
+interface UpdateSubscriptionInput {
+  plan: PlanStatus;
+  status?: SubscriptionStatus;
+  currentPeriodStart?: Date | null;
+  currentPeriodEnd?: Date | null;
 }
 
 function toMe(user: AppUser) {
@@ -75,6 +83,50 @@ export async function getSubscription(userId: string) {
     status: subscription.status,
     currentPeriodStart: subscription.currentPeriodStart,
     currentPeriodEnd: subscription.currentPeriodEnd,
+  };
+}
+
+export async function updateSubscription(
+  userId: string,
+  input: UpdateSubscriptionInput,
+) {
+  const user = await getDoc<AppUser>(collectionNames.users, userId);
+  if (!user) {
+    throw new NotFoundError("User not found");
+  }
+
+  const now = new Date();
+  const currentSubscription = await getDoc<Subscription>(
+    collectionNames.subscriptions,
+    subscriptionId(userId),
+  );
+
+  const isPremium = input.plan === "premium";
+  const nextSubscription: Subscription = {
+    id: currentSubscription?.id ?? subscriptionId(userId),
+    userId,
+    plan: input.plan,
+    status:
+      input.status ?? (isPremium ? currentSubscription?.status ?? "active" : "active"),
+    currentPeriodStart: isPremium
+      ? input.currentPeriodStart ?? currentSubscription?.currentPeriodStart ?? now
+      : null,
+    currentPeriodEnd: isPremium
+      ? input.currentPeriodEnd ?? currentSubscription?.currentPeriodEnd ?? null
+      : null,
+    createdAt: currentSubscription?.createdAt ?? now,
+    updatedAt: now,
+  };
+
+  await docRef(collectionNames.subscriptions, subscriptionId(userId)).set(
+    cleanForFirestore(nextSubscription),
+  );
+
+  return {
+    plan: nextSubscription.plan,
+    status: nextSubscription.status,
+    currentPeriodStart: nextSubscription.currentPeriodStart,
+    currentPeriodEnd: nextSubscription.currentPeriodEnd,
   };
 }
 

@@ -48,6 +48,44 @@ router.get(
   },
 );
 
+const updateSubscriptionSchema = z.object({
+  plan: z.enum(["free", "premium"]),
+  status: z.enum(["trialing", "active", "grace_period", "canceled", "expired"]).optional(),
+  currentPeriodStart: z.string().datetime().nullable().optional(),
+  currentPeriodEnd: z.string().datetime().nullable().optional(),
+});
+
+const handleUpdateSubscription = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const subscription = await userService.updateSubscription(req.user!.userId, {
+      plan: req.body.plan,
+      status: req.body.status,
+      currentPeriodStart:
+        req.body.currentPeriodStart !== undefined ? new Date(req.body.currentPeriodStart) : undefined,
+      currentPeriodEnd:
+        req.body.currentPeriodEnd !== undefined ? new Date(req.body.currentPeriodEnd) : undefined,
+    });
+
+    sendSuccess(res, subscription, "Subscription updated");
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /me/subscription
+router.post("/subscription", validate({ body: updateSubscriptionSchema }), handleUpdateSubscription);
+
+// PATCH /me/subscription
+router.patch(
+  "/subscription",
+  validate({ body: updateSubscriptionSchema }),
+  handleUpdateSubscription,
+);
+
 // GET /me/usage
 router.get(
   "/usage",

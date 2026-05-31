@@ -17,6 +17,22 @@ export async function sendFriendRequest(fromUserId: string, toEmail: string) {
   if (!to) throw new NotFoundError("User not found");
   if (to.id === fromUserId) throw new ValidationError("Cannot send friend request to yourself");
 
+  const existingFriendshipA = await getQuery<any>(
+    collectionRef(collectionNames.friendships)
+      .where("userIdA", "==", fromUserId)
+      .where("userIdB", "==", to.id)
+      .limit(1),
+  );
+  const existingFriendshipB = await getQuery<any>(
+    collectionRef(collectionNames.friendships)
+      .where("userIdA", "==", to.id)
+      .where("userIdB", "==", fromUserId)
+      .limit(1),
+  );
+  if (existingFriendshipA.length > 0 || existingFriendshipB.length > 0) {
+    throw new ConflictError("Already friends");
+  }
+
   const existing = await getQuery<any>(
     collectionRef(collectionNames.friendRequests)
       .where("fromUserId", "==", fromUserId)
@@ -25,10 +41,10 @@ export async function sendFriendRequest(fromUserId: string, toEmail: string) {
   );
   if (existing.length > 0) {
     const ex = existing[0];
-    if (ex.status !== "rejected" && ex.status !== "cancelled") {
+    if (ex.status === "pending") {
       throw new ConflictError("Friend request already sent");
     }
-    // If previous request exists but is not pending (e.g., rejected/cancelled), allow sending again
+    // Accepted/rejected/cancelled requests are historical records only; allow a new request.
   }
 
   const id = createId();
