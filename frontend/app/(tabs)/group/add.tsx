@@ -1,7 +1,7 @@
 import { AntDesign, MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import TopAppBar from "@/components/TopAppBar";
 import { groupService } from "@/api/services/group.service";
@@ -24,6 +24,7 @@ export default function AddGroupScreen() {
   const [category, setCategory] = useState<GroupCategory>("trip");
   const [friends, setFriends] = useState<Array<{ id: string; displayName: string }>>([]);
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [isCreating, setIsCreating] = useState(false);
 
   const selectedCategory = useMemo(() => categories.find((item) => item.value === category), [category]);
 
@@ -36,12 +37,15 @@ export default function AddGroupScreen() {
   };
 
   const handleCreate = async () => {
+    if (isCreating) return;
+
     if (!name.trim()) {
       Alert.alert("Thiếu thông tin", "Vui lòng nhập tên nhóm.");
       return;
     }
 
     try {
+      setIsCreating(true);
       await groupService.createGroup({ name: name.trim(), category, members: selectedMembers });
       useGroupStore.getState().invalidateGroupListCache();
       useHomeStore.getState().invalidate();
@@ -57,6 +61,8 @@ export default function AddGroupScreen() {
     } catch (error) {
       console.error("Create group failed", error);
       Alert.alert("Không thể tạo nhóm", "Thử lại sau nhé.");
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -150,8 +156,15 @@ export default function AddGroupScreen() {
           </View>
         </View>
 
-        <Pressable onPress={handleCreate} style={styles.primaryButton}>
-          <Text style={styles.primaryButtonText}>Tạo nhóm</Text>
+        <Pressable onPress={handleCreate} disabled={isCreating} style={[styles.primaryButton, isCreating && styles.primaryButtonDisabled]}>
+          {isCreating ? (
+            <>
+              <ActivityIndicator size="small" color="#FFFFFF" />
+              <Text style={styles.primaryButtonText}>Đang tạo...</Text>
+            </>
+          ) : (
+            <Text style={styles.primaryButtonText}>Tạo nhóm</Text>
+          )}
         </Pressable>
       </ScrollView>
     </View>
@@ -192,5 +205,6 @@ const styles = StyleSheet.create({
   memberChipTextActive: { color: "#FFFFFF" },
   memberChipTextInactive: { color: "#0F172A" },
   primaryButton: { backgroundColor: "#0F5E28", paddingVertical: 15, borderRadius: 18, alignItems: "center" },
+  primaryButtonDisabled: { opacity: 0.75 },
   primaryButtonText: { color: "#FFFFFF", fontWeight: "800" },
 });
