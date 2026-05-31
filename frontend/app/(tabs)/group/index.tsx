@@ -137,14 +137,14 @@ export default function GroupScreen() {
         contentContainerStyle={styles.content}
         refreshControl={undefined}
       >
-        <View style={styles.headerCard}>
+        {/* <View style={styles.headerCard}>
           <Text style={[styles.pageTitle, { color: textColor }]}>
             Nhóm của bạn
           </Text>
           <Text style={styles.pageSubtitle}>
             Quản lý chi tiêu theo từng nhóm với giao diện mới gọn và rõ hơn.
           </Text>
-        </View>
+        </View> */}
 
         <View style={[styles.searchBar, { backgroundColor: lightGray }]}>
           <EvilIcons name="search" size={24} color={tabIconDefault} />

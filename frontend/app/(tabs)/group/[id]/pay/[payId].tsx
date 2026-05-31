@@ -72,6 +72,11 @@ export default function PayDetailScreen() {
   }, [amount]);
 
   const handleConfirm = async () => {
+    if (!currentUser?.id) {
+      Alert.alert("Lỗi", "Không tìm thấy thông tin người thanh toán");
+      return;
+    }
+
     if (!selectedUser) {
       Alert.alert("Lỗi", "Không tìm thấy người nhận");
       return;
@@ -85,8 +90,8 @@ export default function PayDetailScreen() {
     try {
       setLoading(true);
 
-      await settlementService.createSettlement(String(id), {
-        fromUserId: currentUser?.id || "",
+      const settlement = await settlementService.createSettlement(String(id), {
+        fromUserId: currentUser.id,
         toUserId: selectedUser.userId,
         amount: parsedAmount,
         note: note.trim() || undefined,
@@ -96,11 +101,14 @@ export default function PayDetailScreen() {
       useGroupStore.getState().invalidateGroupListCache();
       useHomeStore.getState().invalidate();
 
-      Alert.alert("Thành công", "Thanh toán thành công", [
+      const recipientName = selectedUser.displayName || settlement.toUser?.displayName || "người nhận";
+      Alert.alert("Thành công", `Đã thanh toán ${parsedAmount.toLocaleString("vi-VN")}đ cho ${recipientName}`, [
         {
           text: "OK",
           onPress: () =>
-            router.replace(`/group/${String(id)}?refresh=${Date.now()}` as any),
+            router.replace(
+              `/group/${String(id)}?refresh=${Date.now()}&settlementId=${settlement.id}` as any,
+            ),
         },
       ]);
     } catch (err) {

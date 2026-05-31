@@ -1,8 +1,14 @@
 export interface Subscription {
-  plan: "free";
-  status: "active" | "inactive";
-  currentPeriodStart: Date | null;
-  currentPeriodEnd: Date | null;
+  plan: "free" | "premium";
+  status:
+    | "trialing"
+    | "active"
+    | "grace_period"
+    | "canceled"
+    | "expired"
+    | "inactive";
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
 }
 
 export interface Usage {

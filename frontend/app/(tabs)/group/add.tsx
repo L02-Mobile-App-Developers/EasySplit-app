@@ -79,11 +79,11 @@ export default function AddGroupScreen() {
     <View style={styles.screen}>
       <TopAppBar title="Tạo nhóm" showBack onBackPress={() => router.replace("/group")} />
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.heroCard}>
+        {/* <View style={styles.heroCard}>
           <View style={styles.badge}><Text style={styles.badgeText}>Material</Text></View>
           <Text style={styles.title}>Tạo một nhóm mới</Text>
           <Text style={styles.subtitle}>Đặt tên, chọn loại nhóm và thêm vài người thân quen trước khi bắt đầu ghi chi tiêu.</Text>
-        </View>
+        </View> */}
 
         <View style={styles.sectionCard}>
           <Text style={styles.label}>Tên nhóm</Text>

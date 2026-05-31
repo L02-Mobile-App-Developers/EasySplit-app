@@ -37,11 +37,11 @@ export default function AddFriendScreen() {
     <View style={styles.screen}>
       <TopAppBar title="Thêm bạn bè" showBack />
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.heroCard}>
+        {/* <View style={styles.heroCard}>
           <View style={styles.badge}><Text style={styles.badgeText}>Invitation</Text></View>
           <Text style={styles.title}>Mời bạn bè cùng dùng EasySplit</Text>
           <Text style={styles.subtitle}>Nhập email, gửi lời mời và bắt đầu chia tiền trong một giao diện rõ ràng hơn.</Text>
-        </View>
+        </View> */}
 
         <View style={styles.sectionCard}>
           <Text style={styles.label}>Email</Text>
@@ -56,15 +56,6 @@ export default function AddFriendScreen() {
               autoCapitalize="none"
               style={styles.input}
             />
-          </View>
-        </View>
-
-        <View style={styles.sectionCard}>
-          <Text style={styles.label}>Lợi ích</Text>
-          <View style={styles.benefitRow}>
-            <View style={styles.benefitItem}><MaterialIcons name="group-add" size={20} color="#0F5E28" /><Text style={styles.benefitText}>Tạo nhóm chung nhanh hơn</Text></View>
-            <View style={styles.benefitItem}><MaterialIcons name="request-page" size={20} color="#0F5E28" /><Text style={styles.benefitText}>Nhận lời mời ngay</Text></View>
-            <View style={styles.benefitItem}><MaterialIcons name="attach-money" size={20} color="#0F5E28" /><Text style={styles.benefitText}>Theo dõi nợ bằng VND</Text></View>
           </View>
         </View>
 

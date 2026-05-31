@@ -8,6 +8,7 @@ export interface Group {
   status: "active" | "closed";
   role: "owner" | "admin" | "member";
   memberCount: number;
+  avatarUrl?: string | null;
   latestActivity?: {
     description: string;
     time: string;

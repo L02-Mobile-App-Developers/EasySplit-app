@@ -2,7 +2,7 @@ import TopAppBar from "@/components/TopAppBar";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useLocalSearchParams, router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Image, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 
 import { expenseService } from "@/api/services/expense.service";
@@ -10,8 +10,18 @@ import { groupService } from "@/api/services/group.service";
 import { balanceService } from "@/api/services/balance.service";
 import { settlementService } from "@/api/services/settlement.service";
 import type { Expense } from "@/api/types/expense";
+import type { GroupMember } from "@/api/types/group";
 import { useGroupStore } from "@/store/group.store";
 import { useHomeStore } from "@/store/home.store";
+
+type SplitMode = "equal" | "amount" | "percent" | "weight";
+
+type EditParticipantDraft = {
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  value: string;
+};
 
 export default function ExpenseDetailScreen() {
   const { id, expenseId } = useLocalSearchParams<{ id: string; expenseId: string }>();
@@ -19,13 +29,27 @@ export default function ExpenseDetailScreen() {
 
   const [expense, setExpense] = useState<Expense | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editLoading, setEditLoading] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editDescription, setEditDescription] = useState("");
+  const [editAmount, setEditAmount] = useState("");
+  const [editPayerId, setEditPayerId] = useState<string | null>(null);
+  const [editSplitMode, setEditSplitMode] = useState<SplitMode>("equal");
+  const [editParticipants, setEditParticipants] = useState<EditParticipantDraft[]>([]);
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   useEffect(() => {
     if (!id || !expenseId) return;
 
     const fetch = async () => {
       try {
-        const data = await expenseService.getExpense(String(id), String(expenseId));
-        setExpense(data);
+        const groupId = String(id);
+        const [expenseData, membersData] = await Promise.all([
+          expenseService.getExpense(groupId, String(expenseId)),
+          groupService.getGroupMembers(groupId),
+        ]);
+
+        setExpense(expenseData);
+        setGroupMembers(membersData);
       } catch (err) {
         console.error("Failed to load expense:", err);
       } finally {
@@ -59,9 +83,262 @@ export default function ExpenseDetailScreen() {
     }
   }, [expense]);
 
+  const payerOptions = useMemo(() => {
+    if (!expense) return [];
+
+    const options = new Map<string, { userId: string; displayName: string; avatarUrl: string | null }>();
+
+    if (expense.payer) {
+      options.set(expense.paidByUserId, {
+        userId: expense.paidByUserId,
+        displayName: expense.payer.displayName,
+        avatarUrl: expense.payer.avatarUrl,
+      });
+    }
+
+    expense.participants.forEach((participant) => {
+      options.set(participant.userId, {
+        userId: participant.userId,
+        displayName: participant.user?.displayName ?? participant.userId,
+        avatarUrl: participant.user?.avatarUrl ?? null,
+      });
+    });
+
+    if (!options.has(expense.paidByUserId)) {
+      options.set(expense.paidByUserId, {
+        userId: expense.paidByUserId,
+        displayName: expense.paidByUserId,
+        avatarUrl: null,
+      });
+    }
+
+    return Array.from(options.values());
+  }, [expense]);
+
   const formatCurrency = (v: number) => v.toLocaleString("vi-VN") + "đ";
 
   const createdAt = expense?.createdAt ? new Date(expense.createdAt).toLocaleString() : "-";
+
+  const hydrateEditState = (currentExpense: Expense) => {
+    setEditDescription(currentExpense.description);
+    setEditAmount(String(currentExpense.amount));
+    setEditPayerId(currentExpense.paidByUserId);
+    setEditSplitMode(currentExpense.splitMode as SplitMode);
+    setEditParticipants(
+      currentExpense.participants.map((participant) => ({
+        userId: participant.userId,
+        displayName: participant.user?.displayName ?? participant.userId,
+        avatarUrl: participant.user?.avatarUrl ?? null,
+        value: String(participant.value ?? 0),
+      })),
+    );
+  };
+
+  const openEditModal = () => {
+    if (!expense) return;
+    hydrateEditState(expense);
+    setShowEditModal(true);
+  };
+
+  const handleEditAmountChange = (text: string) => {
+    const digits = text.replace(/[^0-9]/g, "");
+    if (!digits) {
+      setEditAmount("");
+      return;
+    }
+
+    setEditAmount(digits.replace(/\B(?=(\d{3})+(?!\d))/g, "."));
+  };
+
+  const updateParticipantValue = (userId: string, value: string) => {
+    setEditParticipants((current) =>
+      current.map((participant) =>
+        participant.userId === userId ? { ...participant, value } : participant,
+      ),
+    );
+  };
+
+  const getParticipantDraft = (userId: string) => {
+    const groupMember = groupMembers.find((member) => member.userId === userId);
+    const expenseParticipant = expense?.participants.find((participant) => participant.userId === userId);
+
+    if (!groupMember && !expenseParticipant) return null;
+
+    return {
+      userId,
+      displayName:
+        groupMember?.displayName ?? expenseParticipant?.user?.displayName ?? userId,
+      avatarUrl: groupMember?.avatarUrl ?? expenseParticipant?.user?.avatarUrl ?? null,
+      value: String(expenseParticipant?.value ?? 0),
+    } satisfies EditParticipantDraft;
+  };
+
+  const participantOptions = useMemo(() => {
+    if (!expense) return [];
+
+    const options = new Map<string, { userId: string; displayName: string; avatarUrl: string | null }>();
+
+    groupMembers.forEach((member) => {
+      options.set(member.userId, {
+        userId: member.userId,
+        displayName: member.displayName,
+        avatarUrl: member.avatarUrl,
+      });
+    });
+
+    expense.participants.forEach((participant) => {
+      if (!options.has(participant.userId)) {
+        options.set(participant.userId, {
+          userId: participant.userId,
+          displayName: participant.user?.displayName ?? participant.userId,
+          avatarUrl: participant.user?.avatarUrl ?? null,
+        });
+      }
+    });
+
+    return Array.from(options.values());
+  }, [expense, groupMembers]);
+
+  const toggleEditParticipant = (userId: string) => {
+    setEditParticipants((current) => {
+      const isSelected = current.some((participant) => participant.userId === userId);
+
+      if (isSelected) {
+        return current.filter((participant) => participant.userId !== userId);
+      }
+
+      const draft = getParticipantDraft(userId);
+      return draft ? [...current, draft] : current;
+    });
+  };
+
+  const getEditAmount = () => Number(editAmount.replace(/[^0-9]/g, "")) || 0;
+
+  const buildEditParticipants = () => {
+    const amountValue = getEditAmount();
+
+    if (editSplitMode === "equal") {
+      const count = Math.max(1, editParticipants.length);
+      const base = Math.floor(amountValue / count);
+      let remainder = amountValue - base * count;
+
+      return editParticipants.map((participant) => {
+        const value = base + (remainder > 0 ? 1 : 0);
+        if (remainder > 0) remainder -= 1;
+
+        return {
+          userId: participant.userId,
+          value,
+        };
+      });
+    }
+
+    return editParticipants.map((participant) => ({
+      userId: participant.userId,
+      value: Math.max(0, Math.round(Number(participant.value.replace(/[^0-9]/g, "")) || 0)),
+    }));
+  };
+
+  const handleSaveEdit = async () => {
+    if (!id || !expenseId || !expense || editLoading) return;
+
+    const groupId = String(id);
+    const expenseKey = String(expenseId);
+    const amountValue = getEditAmount();
+
+    if (!editDescription.trim()) {
+      Alert.alert("Thiếu thông tin", "Vui lòng nhập tên khoản chi.");
+      return;
+    }
+
+    if (!amountValue) {
+      Alert.alert("Thiếu thông tin", "Vui lòng nhập số tiền hợp lệ.");
+      return;
+    }
+
+    if (!editPayerId) {
+      Alert.alert("Thiếu thông tin", "Vui lòng chọn người trả.");
+      return;
+    }
+
+    if (editParticipants.length === 0) {
+      Alert.alert("Thiếu thông tin", "Vui lòng chọn ít nhất một người tham gia.");
+      return;
+    }
+
+    const participants = buildEditParticipants();
+
+    if (editSplitMode === "amount") {
+      const total = participants.reduce((sum, participant) => sum + participant.value, 0);
+      if (total !== amountValue) {
+        Alert.alert("Sai thông tin", "Tổng số tiền của các thành viên phải bằng tổng khoản chi.");
+        return;
+      }
+    }
+
+    if (editSplitMode === "percent") {
+      const total = participants.reduce((sum, participant) => sum + participant.value, 0);
+      if (total !== 100) {
+        Alert.alert("Sai thông tin", "Tổng % phải bằng 100%.");
+        return;
+      }
+    }
+
+    setEditLoading(true);
+    try {
+      const updated = await expenseService.updateExpense(groupId, expenseKey, {
+        description: editDescription.trim(),
+        amount: amountValue,
+        currency: expense.currency,
+        paidByUserId: editPayerId,
+        splitMode: editSplitMode,
+        participants,
+      });
+
+      setExpense(updated);
+      hydrateEditState(updated);
+
+      try {
+        const [groupData, membersData, expensePage, balanceData, debtData] = await Promise.all([
+          groupService.getGroup(groupId),
+          groupService.getGroupMembers(groupId),
+          expenseService.getExpenses(groupId),
+          balanceService.getMyBalance(groupId),
+          settlementService.getDebts(groupId),
+        ]);
+
+        useGroupStore.getState().setGroupCache(groupId, {
+          group: groupData,
+          members: membersData,
+          expenses: expensePage.items,
+          myBalance: balanceData,
+          debts: debtData,
+        });
+      } catch (refreshError) {
+        console.error("Failed to refresh group data after update:", refreshError);
+        useGroupStore.getState().invalidateGroupCache(groupId);
+      }
+
+      useGroupStore.getState().invalidateGroupListCache();
+      useHomeStore.getState().invalidate();
+
+      if (Platform.OS === "web") {
+        window.alert("Đã cập nhật khoản chi");
+      } else {
+        Alert.alert("Thành công", "Đã cập nhật khoản chi");
+      }
+
+      setShowEditModal(false);
+      router.replace(`/group/${groupId}?refresh=${Date.now()}` as any);
+    } catch (error) {
+      console.error("Update expense error:", error);
+      const message =
+        (error as any)?.response?.data?.message ?? "Không thể cập nhật khoản chi, thử lại sau.";
+      Alert.alert("Lỗi", message);
+    } finally {
+      setEditLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -176,7 +453,7 @@ export default function ExpenseDetailScreen() {
         </View>
 
         <View style={{ flexDirection: "row", gap: 12, justifyContent: "center" }}>
-          <TouchableOpacity onPress={() => {}} style={{ backgroundColor: "#E6EEF9", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, flex: 1, alignItems: "center" }}>
+          <TouchableOpacity onPress={openEditModal} style={{ backgroundColor: "#E6EEF9", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, flex: 1, alignItems: "center" }}>
             <Text style={{ color: "#374151", fontWeight: "700" }}>Chỉnh sửa</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -258,6 +535,185 @@ export default function ExpenseDetailScreen() {
         </View>
       </ScrollView>
       <Modal
+        visible={showEditModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: backgroundWhite }] }>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <Text style={{ fontSize: 18, fontWeight: "800", color: textColor }}>Chỉnh sửa khoản chi</Text>
+              <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                <Text style={{ color: darkGreen, fontWeight: "700" }}>Đóng</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ height: 1, backgroundColor: "#F3F4F6", marginBottom: 12 }} />
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.editLabel}>Tên khoản chi</Text>
+              <TextInput
+                value={editDescription}
+                onChangeText={setEditDescription}
+                placeholder="Nhập tên khoản chi"
+                style={styles.editInput}
+                placeholderTextColor="#9CA3AF"
+              />
+
+              <Text style={[styles.editLabel, { marginTop: 12 }]}>Số tiền</Text>
+              <TextInput
+                value={editAmount}
+                onChangeText={handleEditAmountChange}
+                placeholder="Nhập số tiền"
+                keyboardType="number-pad"
+                style={styles.editInput}
+                placeholderTextColor="#9CA3AF"
+              />
+
+              <Text style={[styles.editLabel, { marginTop: 12 }]}>Người trả</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  {payerOptions.map((participant) => {
+                    const active = participant.userId === editPayerId;
+                    return (
+                      <TouchableOpacity
+                        key={participant.userId}
+                        onPress={() => setEditPayerId(participant.userId)}
+                        style={[
+                          styles.payerChip,
+                          {
+                            backgroundColor: active ? `${darkGreen}18` : "#F3F4F6",
+                            borderColor: active ? darkGreen : "#E5E7EB",
+                          },
+                        ]}
+                      >
+                        <Image source={{ uri: participant.avatarUrl || "https://ui-avatars.com/api/?name=User" }} style={styles.payerAvatar} />
+                        <Text style={{ color: textColor, fontWeight: active ? "800" : "700" }}>{participant.displayName}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+
+              <Text style={[styles.editLabel, { marginTop: 12 }]}>Cách chia</Text>
+              <View style={styles.splitModeRow}>
+                {([
+                  ["equal", "Chia đều"],
+                  ["amount", "Số tiền"],
+                  ["percent", "%"],
+                  ["weight", "Trọng số"],
+                ] as [SplitMode, string][]).map(([mode, label]) => (
+                  <TouchableOpacity
+                    key={mode}
+                    onPress={() => setEditSplitMode(mode)}
+                    style={[
+                      styles.splitModeChip,
+                      {
+                        backgroundColor: editSplitMode === mode ? `${darkGreen}18` : "#F3F4F6",
+                        borderColor: editSplitMode === mode ? darkGreen : "#E5E7EB",
+                      },
+                    ]}
+                  >
+                    <Text style={{ color: editSplitMode === mode ? darkGreen : textColor, fontWeight: "800" }}>{label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={{ marginTop: 8, color: "#6B7280", fontSize: 12, fontWeight: "600" }}>
+                Đang chọn: {getSplitModeLabel(editSplitMode)}
+              </Text>
+
+              <Text style={[styles.editLabel, { marginTop: 12 }]}>Người tham gia</Text>
+              <Text style={{ marginBottom: 8, color: "#6B7280", fontSize: 12 }}>
+                Chạm vào tên để thêm hoặc bỏ người khỏi bill.
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  {participantOptions.map((member) => {
+                    const active = editParticipants.some((participant) => participant.userId === member.userId);
+
+                    return (
+                      <TouchableOpacity
+                        key={member.userId}
+                        onPress={() => toggleEditParticipant(member.userId)}
+                        style={[
+                          styles.payerChip,
+                          {
+                            backgroundColor: active ? `${darkGreen}18` : "#F3F4F6",
+                            borderColor: active ? darkGreen : "#E5E7EB",
+                          },
+                        ]}
+                      >
+                        <Image
+                          source={{ uri: member.avatarUrl || "https://ui-avatars.com/api/?name=User" }}
+                          style={styles.payerAvatar}
+                        />
+                        <Text style={{ color: textColor, fontWeight: active ? "800" : "700" }}>
+                          {member.displayName}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+
+              {editParticipants.length === 0 ? (
+                <Text style={{ color: "#9CA3AF", fontSize: 12, marginBottom: 6 }}>
+                  Chưa có người tham gia nào được chọn.
+                </Text>
+              ) : null}
+              <View style={{ gap: 10 }}>
+                {editParticipants.map((participant) => {
+                  const valueLabel = editSplitMode === "percent" ? "%" : editSplitMode === "weight" ? "w" : "đ";
+                  const editable = editSplitMode !== "equal";
+                  return (
+                    <View key={participant.userId} style={styles.participantEditRow}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
+                        <Image
+                          source={{ uri: participant.avatarUrl || "https://ui-avatars.com/api/?name=User" }}
+                          style={styles.participantEditAvatar}
+                        />
+                        <Text style={{ color: textColor, fontWeight: "700", flex: 1 }} numberOfLines={1}>
+                          {participant.displayName}
+                        </Text>
+                      </View>
+                      <View style={styles.participantEditValueWrap}>
+                        <TextInput
+                          value={participant.value}
+                          onChangeText={(value) => updateParticipantValue(participant.userId, value)}
+                          editable={editable}
+                          keyboardType="number-pad"
+                          style={[
+                            styles.participantEditValue,
+                            !editable && { backgroundColor: "#F9FAFB", color: "#9CA3AF" },
+                          ]}
+                        />
+                        <Text style={{ marginLeft: 6, color: "#6B7280", fontWeight: "700" }}>{valueLabel}</Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+
+              <TouchableOpacity
+                onPress={handleSaveEdit}
+                disabled={editLoading}
+                style={[
+                  styles.saveEditButton,
+                  { backgroundColor: editLoading ? "#9CA3AF" : darkGreen },
+                ]}
+              >
+                {editLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.saveEditButtonText}>Lưu thay đổi</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+      <Modal
         visible={showPercentModal}
         animationType="slide"
         transparent={true}
@@ -300,6 +756,21 @@ export default function ExpenseDetailScreen() {
   );
 }
 
+  function getSplitModeLabel(mode: SplitMode) {
+    switch (mode) {
+      case "equal":
+        return "Chia đều";
+      case "amount":
+        return "Số tiền";
+      case "percent":
+        return "%";
+      case "weight":
+        return "Trọng số";
+      default:
+        return "Chia đều";
+    }
+  }
+
 const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   content: { padding: 16, gap: 12 },
@@ -316,5 +787,61 @@ const styles = StyleSheet.create({
   partValue: { fontWeight: "700" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
   modalContent: { padding: 16, borderTopLeftRadius: 12, borderTopRightRadius: 12, maxHeight: "70%" },
+  editLabel: { fontSize: 12, fontWeight: "700", color: "#6B7280", marginBottom: 8 },
+  editInput: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: "#111827",
+    backgroundColor: "#FFFFFF",
+    marginBottom: 4,
+  },
+  payerChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  payerAvatar: { width: 24, height: 24, borderRadius: 12 },
+  splitModeRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  splitModeChip: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  participantEditRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 4,
+  },
+  participantEditAvatar: { width: 32, height: 32, borderRadius: 16 },
+  participantEditValueWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  participantEditValue: {
+    width: 90,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    textAlign: "right",
+    backgroundColor: "#FFFFFF",
+  },
+  saveEditButton: {
+    marginTop: 16,
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: "center",
+  },
+  saveEditButtonText: { color: "#FFFFFF", fontWeight: "800" },
 });
 

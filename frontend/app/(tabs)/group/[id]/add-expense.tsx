@@ -69,6 +69,15 @@ export default function AddExpenseScreen() {
   }, [parsedAmount, selectedCount, splitMode, sumParticipantAmounts]);
 
   const formatCurrency = (value: number) => `${value.toLocaleString("vi-VN")}đ`;
+  const handleAmountChange = (text: string) => {
+    const digits = text.replace(/[^0-9]/g, "");
+    if (!digits) {
+      setAmount("");
+      return;
+    }
+    const withSep = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    setAmount(withSep);
+  };
   const sumParticipantPercents = useMemo(() => {
     return Object.values(participantPercents).reduce((acc, v) => acc + (Number(v) || 0), 0);
   }, [participantPercents]);
@@ -392,7 +401,7 @@ export default function AddExpenseScreen() {
             >
               <TextInput
                 value={amount}
-                onChangeText={setAmount}
+                onChangeText={handleAmountChange}
                 keyboardType="number-pad"
                 placeholder="0"
                 placeholderTextColor="#9CA3AF"
